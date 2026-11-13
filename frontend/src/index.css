@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta de prevención: amarillo seguridad, negro y blanco */
+  --color-ph-yellow: #ffc400;
+  --color-ph-yellow-dark: #e6ac00;
+  --color-ph-yellow-tint: #fff6d1;
+  --color-ph-black: #111111;
+
+  /* Rojo de peligro: solo para errores y prioridad alta */
+  --color-danger: #d92d20;
+  --color-danger-tint: #fdeceb;
+
+  --color-ink: #1a1a1a;
+  --color-ink-soft: #4b4b4f;
+  --color-muted: #8a8a90;
+
+  --color-surface: #ffffff;
+  --color-surface-alt: #f7f7f8;
+  --color-surface-sidebar: #111111;
+  --color-border: #e7e7ea;
+
+  --color-warn: #e08a1e;
+  --color-warn-tint: #fdf1e2;
+  --color-success: #1f9d63;
+  --color-success-tint: #e6f6ee;
+
+  --font-display: "Oswald", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-surface-alt);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Barra de "medidor" de prioridad: el elemento distintivo de PetroHelp,
+   evoca la aguja de un indicador de combustible/presión. */
+.priority-gauge {
+  position: relative;
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+::selection {
+  background-color: var(--color-ph-yellow);
+  color: var(--color-ph-black);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scrollbar discreto */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface-alt);
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 4px;
+}
+
+/* Franja de precaución amarillo/negro (cinta de seguridad) */
+.hazard-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-ph-yellow) 0 12px,
+    var(--color-ph-black) 12px 24px
+  );
+}
+
+/* Flotado suave para las figuras decorativas del login */
+@keyframes flotar {
+  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+  50% { transform: translateY(-14px) rotate(var(--rot, 0deg)); }
+}
+.flotar { animation: flotar 7s ease-in-out infinite; }
+.flotar-lento { animation: flotar 11s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .flotar, .flotar-lento { animation: none; }
+}

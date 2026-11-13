@@ -1,0 +1,21 @@
+[
+  {
+    "device_id": "esp32-est01-tanque1",
+    "api_key": "cambia-esta-clave-01",
+    "nombre": "Tanque Magna - Estación 1",
+    "ubicacion": "Zona de tanques, pozo de monitoreo 1",
+    "estacion_id": 1,
+    "activo": true
+  },
+  {
+    "device_id": "esp32-est01-bombas",
+    "api_key": "cambia-esta-clave-02",
+    "nombre": "Islas de bombas - Estación 1",
+    "ubicacion": "Islas 1 a 4",
+    "estacion_id": 1,
+    "activo": true,
+    "umbrales": {
+      "temperatura": { "media": 45, "alta": 55, "direccion": "mayor" }
+    }
+  }
+]

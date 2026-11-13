@@ -1,0 +1,23 @@
+# ---------- Python ----------
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# ---------- Node / Vite ----------
+node_modules/
+dist/
+
+# ---------- Secretos y datos locales (NUNCA subir) ----------
+.env
+*.db
+db.sqlite3
+backend/petrohelp_project/media/
+backend/esp32_agent/dispositivos.json
+backend/esp32_firmware/**/config.h
+
+# ---------- Sistema / editor ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
