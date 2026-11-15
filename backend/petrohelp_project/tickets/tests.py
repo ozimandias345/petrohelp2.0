@@ -5,6 +5,11 @@ Ejecutar:  python manage.py test
 Revisan las reglas más importantes del sistema (roles, cierre de tickets,
 historial, comentarios y usuarios desactivados).
 """
+import tempfile
+import zipfile
+from pathlib import Path
+
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from .models import Categoria, Departamento, Estacion, HistorialTicket, Ticket, Usuario
@@ -147,3 +152,20 @@ class PetroHelpTests(APITestCase):
         xlsx = self.client.get("/api/reportes/incidencias/?formato=xlsx")
         self.assertEqual(xlsx.status_code, 200)
         self.assertTrue(xlsx.content.startswith(b"PK"))
+
+    # ---------- Respaldos (DRP) ----------
+    def test_respaldo_y_restauracion(self):
+        tid = self.crear_ticket()
+        with tempfile.TemporaryDirectory() as carpeta:
+            call_command("respaldar", carpeta=carpeta, verbosity=0)
+            archivos = list(Path(carpeta).glob("petrohelp_*.zip"))
+            self.assertEqual(len(archivos), 1)
+            with zipfile.ZipFile(archivos[0]) as z:
+                self.assertIn("datos.json", z.namelist())
+
+            # Desastre simulado: se pierde el ticket
+            Ticket.objects.all().delete()
+            self.assertFalse(Ticket.objects.exists())
+
+            call_command("restaurar", str(archivos[0]), verbosity=0)
+            self.assertTrue(Ticket.objects.filter(pk=tid, titulo="Bomba 3 no despacha").exists())

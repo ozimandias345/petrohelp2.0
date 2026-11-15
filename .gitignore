@@ -33,3 +33,6 @@ frontend/android/local.properties
 
 # ---------- Django en produccion ----------
 staticfiles/
+
+# ---------- Respaldos (contienen datos reales) ----------
+respaldos/
