@@ -119,6 +119,23 @@ DATABASES = {
     }
 }
 
+# ---------------------------------------------------------
+# Producción en la nube (Render). Solo se activa cuando existe
+# la variable DATABASE_URL; en tu computadora no cambia nada.
+# ---------------------------------------------------------
+EN_LA_NUBE = bool(os.getenv("DATABASE_URL"))
+if EN_LA_NUBE:
+    import dj_database_url
+
+    DATABASES["default"] = dj_database_url.parse(
+        os.environ["DATABASE_URL"], conn_max_age=600
+    )
+    # Render recibe las peticiones por HTTPS y las pasa a Django por HTTP:
+    # con esto los enlaces (fotos de evidencia) salen con https.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # WhiteNoise sirve los archivos estáticos del panel /admin.
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -155,6 +172,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Archivos subidos por usuarios (fotos de evidencia de tickets, etc.)
 MEDIA_URL = 'media/'

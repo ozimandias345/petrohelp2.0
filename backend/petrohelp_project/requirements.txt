@@ -7,3 +7,6 @@ Pillow
 reportlab
 openpyxl
 python-dotenv
+gunicorn
+whitenoise
+dj-database-url

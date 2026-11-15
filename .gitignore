@@ -30,3 +30,6 @@ frontend/android/build/
 frontend/android/app/build/
 frontend/android/local.properties
 *.apk
+
+# ---------- Django en produccion ----------
+staticfiles/
