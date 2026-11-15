@@ -9,6 +9,7 @@ así se respetan sus permisos: un operador solo ve sus tickets, y el
 admin_global no puede crear tickets (igual que en la página).
 """
 import json
+import re
 import logging
 from datetime import datetime, timezone
 
@@ -33,8 +34,34 @@ Reglas:
   o no está claro el problema, pregunta antes de crearlo. Elige tú la categoría y la prioridad
   (alta = riesgo para personas o fuga/derrame; media = afecta la operación; baja = menor).
 - Antes de crear el ticket, resume en una línea lo que vas a registrar y créalo; después da el número.
-- Si una herramienta devuelve error de permisos, explícalo de forma sencilla.
-- Hoy es {hoy}. El usuario es {usuario} (rol: {rol})."""
+- Cuando el usuario diga que quiere crear o reportar un ticket, PRIMERO explícale cómo hacerlo
+  él mismo en PetroHelp, con estos pasos exactos:
+    1. En el menú de la izquierda, entra a "Nuevo ticket".
+    2. Escribe un título corto y describe el problema.
+    3. Elige la estación, la categoría y la prioridad (alta, media o baja).
+    4. Si quieres, adjunta una foto como evidencia.
+    5. Presiona "Crear ticket". Aparecerá en "Tickets" con estado Abierto.
+  Después ofrécele crearlo tú por él si te da los datos (qué pasó y en qué estación).
+- NUNCA digas que creaste o registraste un ticket si no usaste la herramienta crear_ticket y
+  recibiste un ticket_id. Al crearlo, menciona el número real (por ejemplo "Ticket #25") y dile
+  que ya aparece en su sección "Tickets".
+- Si una herramienta devuelve error de permisos, explica que su rol no lo permite. No inventes
+  fallas técnicas, restricciones temporales ni soporte técnico.
+- Reglas de roles de PetroHelp: el admin_global supervisa y NO puede crear tickets (los crean
+  operadores o administradores de departamento). Un operador solo ve sus propios tickets.
+- Hoy es {hoy}. El usuario es {usuario} (rol: {rol}).{nota_rol}"""
+
+NOTA_ADMIN_GLOBAL = """
+IMPORTANTE: este usuario es admin_global y NO puede crear tickets (ni desde el chat ni desde
+"Nuevo ticket"). Si quiere reportar algo, NO le des los pasos para crearlo: dile amablemente que
+un operador o el administrador del departamento debe registrarlo, y ofrécele consultar tickets,
+alertas o sensores."""
+
+# Detecta respuestas que dicen haber creado un ticket sin haberlo hecho.
+_PATRON_CREADO = re.compile(
+    r"(he|ya|acabo de)\s+(creado|registrado|generado)|ticket\s*(#\s*\d+\s*)?(ha sido|fue|qued[oó])\s+(creado|registrado|generado)|\bcreé\s+(el|tu|un)\s+ticket",
+    re.IGNORECASE,
+)
 
 
 HERRAMIENTAS_DISPOSITIVOS = [
@@ -221,11 +248,16 @@ async def ejecutar(nombre: str, args: dict, token: str, ctx: dict):
 # =========================================================
 async def responder(mensajes: list[dict], usuario: dict, token: str) -> dict:
     es_admin = usuario.get("rol") in ("admin_global", "admin_departamento")
+    es_global = usuario.get("rol") == "admin_global"
     herramientas = HERRAMIENTAS_TICKETS + (HERRAMIENTAS_DISPOSITIVOS if es_admin else [])
+    if es_global:
+        # Igual que en la página: el admin_global no crea tickets.
+        herramientas = [h for h in herramientas if h["name"] != "crear_ticket"]
     sistema = SISTEMA.format(
         hoy=datetime.now().strftime("%d/%m/%Y %H:%M"),
         usuario=usuario.get("first_name") or usuario.get("username"),
         rol=usuario.get("rol"),
+        nota_rol=NOTA_ADMIN_GLOBAL if es_global else "",
     )
 
     historial = [{"role": "system", "content": sistema}]
@@ -237,6 +269,13 @@ async def responder(mensajes: list[dict], usuario: dict, token: str) -> dict:
         llamadas = msg.get("tool_calls") or []
         if not llamadas:
             texto = (msg.get("content") or "").strip()
+            if not ctx["tickets_creados"] and _PATRON_CREADO.search(texto):
+                # El modelo dijo que creó el ticket pero no usó la herramienta.
+                texto = (
+                    "Todavía no he registrado el ticket. Puedes crearlo tú en el menú "
+                    "\"Nuevo ticket\" (título, descripción, estación, categoría y prioridad, y "
+                    "luego \"Crear ticket\"), o dime qué pasó y en qué estación y lo registro por ti."
+                )
             return {"respuesta": texto or "…", "tickets_creados": ctx["tickets_creados"]}
 
         historial.append({

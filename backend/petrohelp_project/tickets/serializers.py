@@ -42,6 +42,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
             "rol", "departamento", "departamento_nombre", "activo", "password",
         ]
 
+    def validate(self, data):
+        if self.instance is None and not data.get("password"):
+            raise serializers.ValidationError(
+                {"password": "La contraseña es obligatoria al crear un usuario."}
+            )
+        return data
+
     def create(self, validated_data):
         password = validated_data.pop("password", None)
         user = Usuario(**validated_data)
@@ -67,6 +74,23 @@ class ComentarioTicketSerializer(serializers.ModelSerializer):
         model = ComentarioTicket
         fields = ["id", "ticket", "usuario", "usuario_nombre", "comentario", "fecha"]
         read_only_fields = ["fecha", "usuario"]
+
+    def validate_ticket(self, ticket):
+        # Solo se puede comentar en tickets que el usuario puede ver.
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return ticket
+        permitido = (
+            user.rol == "admin_global"
+            or (user.rol == "admin_departamento" and ticket.departamento_id == user.departamento_id)
+            or ticket.creado_por_id == user.id
+        )
+        if not permitido:
+            raise serializers.ValidationError("No tienes acceso a este ticket.")
+        if self.instance is not None and self.instance.ticket_id != ticket.id:
+            raise serializers.ValidationError("No se puede mover un comentario a otro ticket.")
+        return ticket
 
 
 class HistorialTicketSerializer(serializers.ModelSerializer):

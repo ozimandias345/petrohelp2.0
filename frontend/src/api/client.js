@@ -4,7 +4,10 @@ import axios from "axios";
 // red, etc.) para hablarle al backend en el puerto 8000. Así funciona
 // igual entrando desde la compu (http://localhost:5173) que desde el
 // celular (http://192.168.x.x:5173), sin tener que tocar este archivo.
-export const API_BASE_URL = `http://${window.location.hostname}:8000/api`;
+// En la app de Android (Capacitor) no hay "mismo host": la dirección del
+// backend se toma de VITE_API_URL (archivo .env.android).
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000/api`;
 
 const client = axios.create({
   baseURL: API_BASE_URL,

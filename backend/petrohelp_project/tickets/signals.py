@@ -10,6 +10,7 @@ Aquí vive la lógica que antes hacíamos a mano desde el admin:
 from django.db.models import Q
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from .models import Ticket, HistorialTicket, Notificacion, Usuario
@@ -28,6 +29,15 @@ def guardar_estado_anterior(sender, instance, **kwargs):
             instance._estado_anterior = None
     else:
         instance._estado_anterior = None
+
+    # Fecha de cierre: se pone sola al cerrar y se limpia si se reabre.
+    # (Antes nunca se llenaba y los reportes no podían calcular cuánto
+    # tardó en resolverse cada incidencia.)
+    if instance.estado == Ticket.Estado.CERRADO:
+        if not instance.fecha_cierre:
+            instance.fecha_cierre = timezone.now()
+    else:
+        instance.fecha_cierre = None
 
 
 # =========================================================
@@ -63,7 +73,13 @@ def registrar_historial_y_notificar(sender, instance, created, **kwargs):
         # 1. Registrar en el historial (RF-08)
         HistorialTicket.objects.create(
             ticket=instance,
-            usuario=instance.asignado_a or instance.creado_por,
+            # Quien realmente hizo el cambio (lo marca la vista); si el
+            # cambio no vino de la API, se usa el asignado o el creador.
+            usuario=(
+                getattr(instance, "_usuario_cambio", None)
+                or instance.asignado_a
+                or instance.creado_por
+            ),
             estado_anterior=estado_anterior,
             estado_nuevo=instance.estado,
         )

@@ -163,7 +163,7 @@ export default function CreateTicket() {
               className="w-full bg-surface-alt border border-border rounded-md px-3.5 py-2.5 text-ink focus:outline-none focus:ring-2 focus:ring-ph-yellow"
             >
               <option value="">Selecciona…</option>
-              {estaciones.map((e) => (
+              {estaciones.filter((e) => e.activa !== false).map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.nombre}
                 </option>

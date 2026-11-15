@@ -1,5 +1,6 @@
 from django.db.models import ProtectedError
 from rest_framework import viewsets, filters, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import (
@@ -121,7 +122,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = self.request.user
         base = Ticket.objects.select_related(
             "categoria", "departamento", "estacion", "creado_por"
-        ).prefetch_related("comentarios", "historial")
+        ).prefetch_related("comentarios__usuario", "historial")
 
         if not user.is_authenticated:
             return base.none()
@@ -136,14 +137,43 @@ class TicketViewSet(viewsets.ModelViewSet):
         # nunca un valor que venga en el body de la petición.
         serializer.save(creado_por=self.request.user)
 
+    def perform_update(self, serializer):
+        # Para que el historial registre quién cambió el estado de verdad
+        # (antes siempre quedaba a nombre del creador del ticket).
+        serializer.instance._usuario_cambio = self.request.user
+        serializer.save()
+
+
+def _solo_tickets_visibles(qs, user):
+    """Limita comentarios/historial a los tickets que el usuario puede ver."""
+    if user.rol == "admin_global":
+        return qs
+    if user.rol == "admin_departamento":
+        return qs.filter(ticket__departamento=user.departamento)
+    return qs.filter(ticket__creado_por=user)
+
 
 class ComentarioTicketViewSet(viewsets.ModelViewSet):
     queryset = ComentarioTicket.objects.select_related("usuario", "ticket").all()
     serializer_class = ComentarioTicketSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        # Antes cualquier usuario podía leer los comentarios de todos los tickets.
+        return _solo_tickets_visibles(super().get_queryset(), self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.usuario_id != self.request.user.id:
+            raise PermissionDenied("Solo puedes editar tus propios comentarios.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.usuario_id != self.request.user.id and self.request.user.rol != "admin_global":
+            raise PermissionDenied("Solo puedes borrar tus propios comentarios.")
+        instance.delete()
 
 
 class HistorialTicketViewSet(viewsets.ReadOnlyModelViewSet):
@@ -151,6 +181,9 @@ class HistorialTicketViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = HistorialTicket.objects.select_related("usuario", "ticket").all()
     serializer_class = HistorialTicketSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return _solo_tickets_visibles(super().get_queryset(), self.request.user)
 
 
 class NotificacionViewSet(viewsets.ReadOnlyModelViewSet):

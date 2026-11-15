@@ -11,6 +11,7 @@ const SUGERENCIAS_ADMIN = [
   "¿Qué alertas hubo hoy?",
 ];
 const SUGERENCIAS_OPERADOR = [
+  "¿Cómo creo un ticket?",
   "Quiero reportar un problema",
   "¿Cómo van mis tickets?",
 ];
@@ -85,6 +86,12 @@ export default function ChatBot({ user }) {
         ...prev,
         { role: "assistant", content: data.respuesta, tickets: data.tickets_creados },
       ]);
+      // Avisar al resto de la app (lista de tickets, dashboard) que hay tickets nuevos
+      if (data.tickets_creados?.length) {
+        window.dispatchEvent(
+          new CustomEvent("petrohelp:tickets-actualizados", { detail: data.tickets_creados })
+        );
+      }
     } catch (err) {
       const detalle =
         err.response?.data?.detail ||

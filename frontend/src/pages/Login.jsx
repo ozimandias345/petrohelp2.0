@@ -117,34 +117,6 @@ function FigurasFormulario() {
   );
 }
 
-// Figuras del panel oscuro
-function FigurasPanel() {
-  return (
-    <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-      {/* Cuadrados concéntricos rotados */}
-      <div className="absolute -right-32 -bottom-32 w-[460px] h-[460px] rotate-45 border-2 border-ph-yellow/25 rounded-3xl" />
-      <div className="absolute -right-10 -bottom-10 w-[300px] h-[300px] rotate-45 border-2 border-ph-yellow/40 rounded-2xl" />
-      <div className="absolute right-16 bottom-16 w-[140px] h-[140px] rotate-45 bg-ph-yellow/90 rounded-xl" />
-      {/* Hexágonos tenues arriba a la derecha */}
-      <svg viewBox="0 0 200 180" className="flotar-lento absolute top-[10%] right-[8%] w-64 opacity-60">
-        <g fill="none" stroke="#ffffff" strokeOpacity=".12" strokeWidth="2.5">
-          <path d={HEX} /><path d={HEX} transform="translate(86 0)" /><path d={HEX} transform="translate(43 74)" />
-        </g>
-      </svg>
-      {/* Puntos */}
-      <div
-        className="absolute left-0 bottom-0 w-80 h-64 opacity-40"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,196,0,0.5) 1.5px, transparent 1.5px)",
-          backgroundSize: "18px 18px",
-          maskImage: "linear-gradient(to top right, black, transparent 70%)",
-          WebkitMaskImage: "linear-gradient(to top right, black, transparent 70%)",
-        }}
-      />
-    </div>
-  );
-}
-
 function UserIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4">
@@ -217,8 +189,15 @@ export default function Login() {
         localStorage.removeItem(REMEMBER_KEY);
       }
       navigate("/");
-    } catch {
-      setError("Usuario o contraseña incorrectos.");
+    } catch (err) {
+      // Sin respuesta del servidor = problema de conexión, no de contraseña.
+      if (!err.response) {
+        setError("No se pudo conectar con el servidor. Revisa que el backend esté encendido y que estés en la misma red.");
+      } else if (err.response.status === 400 || err.response.status === 401) {
+        setError("Usuario o contraseña incorrectos, o el usuario está desactivado.");
+      } else {
+        setError("El servidor tuvo un problema. Intenta de nuevo en un momento.");
+      }
     } finally {
       setLoading(false);
     }
@@ -228,8 +207,7 @@ export default function Login() {
     <div className="min-h-screen grid lg:grid-cols-[1.15fr_1fr] bg-surface-alt">
       {/* Panel de marca (solo en pantallas grandes) */}
       <section className="hidden lg:flex relative flex-col justify-between overflow-hidden bg-surface-sidebar text-white px-14 xl:px-20 py-14">
-        <div className="hazard-stripes absolute top-0 inset-x-0 h-3" />
-        <FigurasPanel />
+        <div className="hazard-stripes absolute top-0 inset-x-0 h-1.5" />
 
         <div className="relative flex items-center gap-5 animate-fade-up">
           <img
@@ -275,36 +253,6 @@ export default function Login() {
               </li>
             ))}
           </ul>
-
-          {/* Ejemplo visual del monitoreo (ilustrativo) */}
-          <div className="mt-12 bg-white/[0.04] border border-white/10 rounded-xl p-5 max-w-lg backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-mono uppercase tracking-wide text-white/50">
-                Ejemplo · Tanque Magna, Estación 1
-              </p>
-              <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-                <span className="w-2 h-2 rounded-full bg-success" /> Todo en orden
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                ["Gas", "42", "ppm", 14],
-                ["Temperatura", "26.4", "°C", 53],
-                ["Tanque", "68", "%", 68],
-              ].map(([nombre, valor, unidad, pct]) => (
-                <div key={nombre} className="bg-white/[0.05] rounded-lg p-3">
-                  <p className="text-[11px] font-mono uppercase tracking-wide text-white/45">{nombre}</p>
-                  <p className="font-display text-2xl font-semibold mt-0.5">
-                    {valor}
-                    <span className="text-xs font-body font-normal text-white/50 ml-0.5">{unidad}</span>
-                  </p>
-                  <div className="h-1 rounded-full bg-white/10 mt-2 overflow-hidden">
-                    <div className="h-full rounded-full bg-ph-yellow" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="relative self-start flex items-center gap-3 bg-ph-black border border-ph-yellow/40 rounded-lg px-4 py-3">

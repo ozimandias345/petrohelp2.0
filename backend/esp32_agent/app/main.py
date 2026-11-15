@@ -73,6 +73,10 @@ class Lectura(BaseModel):
 # =========================================================
 # Procesamiento de alertas (en segundo plano)
 # =========================================================
+_en_proceso: set = set()  # (device_id, sensor) que se están analizando ahora
+REINTENTO_MINUTOS = 2
+
+
 async def procesar_anomalias(disp: dict, anomalias: list[reglas.Anomalia]):
     device_id = disp["device_id"]
     error_django = ""
@@ -88,10 +92,29 @@ async def procesar_anomalias(disp: dict, anomalias: list[reglas.Anomalia]):
     recientes = db.ultimas_lecturas(device_id, 10)
 
     for anom in anomalias:
+        clave = (device_id, anom.sensor)
+        # Las lecturas llegan cada pocos segundos y la IA puede tardar más que eso:
+        # si ya se está analizando esta misma alerta, no se lanza otra en paralelo
+        # (antes podían crearse dos tickets iguales).
+        if clave in _en_proceso:
+            continue
         if db.en_cooldown(device_id, anom.sensor, config.COOLDOWN_MINUTOS):
             log.info("%s/%s en cooldown, no se crea otro ticket", device_id, anom.sensor)
             continue
+        # Si el intento anterior no logró crear ticket, se reintenta cada 2 minutos
+        # en vez de registrar una alerta nueva con cada lectura.
+        if db.alerta_reciente(device_id, anom.sensor, REINTENTO_MINUTOS):
+            continue
 
+        _en_proceso.add(clave)
+        try:
+            await _atender_anomalia(disp, anom, anomalias, recientes, categorias, error_django)
+        finally:
+            _en_proceso.discard(clave)
+
+
+async def _atender_anomalia(disp, anom, anomalias, recientes, categorias, error_django):
+        device_id = disp["device_id"]
         decision = await agente_ia.decidir(disp, anom, anomalias, recientes, categorias)
         ticket_id = None
 

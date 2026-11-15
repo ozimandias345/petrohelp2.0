@@ -105,6 +105,19 @@ def en_cooldown(device_id: str, sensor: str, minutos: int) -> bool:
     return fila is not None
 
 
+def alerta_reciente(device_id: str, sensor: str, minutos: int) -> bool:
+    """True si ya se registró CUALQUIER alerta de este sensor hace menos de `minutos`
+    (con o sin ticket). Evita llenar la lista de alertas repetidas cuando Django
+    no responde o la IA descarta la lectura."""
+    desde = (datetime.now(timezone.utc) - timedelta(minutes=minutos)).isoformat()
+    with conexion() as con:
+        fila = con.execute(
+            "SELECT 1 FROM alertas WHERE device_id = ? AND sensor = ? AND ts >= ? LIMIT 1",
+            (device_id, sensor, desde),
+        ).fetchone()
+    return fila is not None
+
+
 def listar_alertas(limite: int = 50, device_id: str | None = None) -> list[dict]:
     sql = "SELECT * FROM alertas"
     params: list = []

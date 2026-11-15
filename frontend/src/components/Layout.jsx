@@ -20,9 +20,6 @@ import NotificationBell from "./NotificationBell";
 import ChatBot from "./ChatBot";
 import logo from "../assets/petrohelp_logo.svg";
 
-const navItemBase =
-  "flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors";
-
 function NavItem({ to, children, icon, end, onNavigate }) {
   return (
     <NavLink
@@ -30,16 +27,45 @@ function NavItem({ to, children, icon, end, onNavigate }) {
       end={end}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `${navItemBase} ${
+        `group relative flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
           isActive
-            ? "bg-ph-yellow text-ph-black"
-            : "text-white/70 hover:bg-white/10 hover:text-white"
+            ? "bg-ph-yellow/10 text-white"
+            : "text-white/60 hover:text-white hover:bg-white/[0.04]"
         }`
       }
     >
-      <span className="shrink-0 opacity-90">{icon}</span>
-      {children}
+      {({ isActive }) => (
+        <>
+          {/* Barrita indicadora */}
+          <span
+            className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-ph-yellow transition-all duration-200 ${
+              isActive ? "h-6 opacity-100" : "h-0 opacity-0"
+            }`}
+          />
+          <span
+            className={`w-8 h-8 shrink-0 rounded-md flex items-center justify-center transition-colors ${
+              isActive
+                ? "bg-ph-yellow text-ph-black"
+                : "bg-white/[0.05] text-white/70 group-hover:bg-white/10 group-hover:text-ph-yellow"
+            }`}
+          >
+            {icon}
+          </span>
+          <span className="truncate">{children}</span>
+        </>
+      )}
     </NavLink>
+  );
+}
+
+function SeccionNav({ titulo, children }) {
+  return (
+    <div>
+      <p className="px-3 mb-1.5 text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-white/35">
+        {titulo}
+      </p>
+      <div className="space-y-0.5">{children}</div>
+    </div>
   );
 }
 
@@ -119,45 +145,47 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <NavItem to="/" end icon={<TicketIcon />} onNavigate={cerrarMenu}>
-            Tickets
-          </NavItem>
-          {puedeCrearTicket && (
-            <NavItem to="/tickets/nuevo" icon={<PlusCircleIcon />} onNavigate={cerrarMenu}>
-              Nuevo ticket
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+          <SeccionNav titulo="Operación">
+            <NavItem to="/" end icon={<TicketIcon />} onNavigate={cerrarMenu}>
+              Tickets
             </NavItem>
-          )}
+            {puedeCrearTicket && (
+              <NavItem to="/tickets/nuevo" icon={<PlusCircleIcon />} onNavigate={cerrarMenu}>
+                Nuevo ticket
+              </NavItem>
+            )}
+            <NavItem to="/mapa" icon={<MapIcon />} onNavigate={cerrarMenu}>
+              Mapa
+            </NavItem>
+            <NavItem to="/reportes" icon={<ReportIcon />} onNavigate={cerrarMenu}>
+              Reportes
+            </NavItem>
+          </SeccionNav>
+
           {isAdmin && (
-            <NavItem to="/dashboard" icon={<ChartIcon />} onNavigate={cerrarMenu}>
-              Dashboard
-            </NavItem>
+            <SeccionNav titulo="Monitoreo">
+              <NavItem to="/dashboard" icon={<ChartIcon />} onNavigate={cerrarMenu}>
+                Dashboard
+              </NavItem>
+              <NavItem to="/dispositivos" icon={<ChipIcon />} onNavigate={cerrarMenu}>
+                Dispositivos
+              </NavItem>
+            </SeccionNav>
           )}
-          <NavItem to="/mapa" icon={<MapIcon />} onNavigate={cerrarMenu}>
-            Mapa
-          </NavItem>
-          <NavItem to="/reportes" icon={<ReportIcon />} onNavigate={cerrarMenu}>
-            Reportes
-          </NavItem>
-          {isAdmin && (
-            <NavItem to="/dispositivos" icon={<ChipIcon />} onNavigate={cerrarMenu}>
-              Dispositivos
-            </NavItem>
-          )}
+
           {user?.rol === "admin_global" && (
-            <NavItem to="/usuarios" icon={<UsersIcon />} onNavigate={cerrarMenu}>
-              Usuarios
-            </NavItem>
-          )}
-          {user?.rol === "admin_global" && (
-            <NavItem to="/departamentos" icon={<BuildingIcon />} onNavigate={cerrarMenu}>
-              Departamentos
-            </NavItem>
-          )}
-          {user?.rol === "admin_global" && (
-            <NavItem to="/categorias" icon={<TagIcon />} onNavigate={cerrarMenu}>
-              Categorías
-            </NavItem>
+            <SeccionNav titulo="Administración">
+              <NavItem to="/usuarios" icon={<UsersIcon />} onNavigate={cerrarMenu}>
+                Usuarios
+              </NavItem>
+              <NavItem to="/departamentos" icon={<BuildingIcon />} onNavigate={cerrarMenu}>
+                Departamentos
+              </NavItem>
+              <NavItem to="/categorias" icon={<TagIcon />} onNavigate={cerrarMenu}>
+                Categorías
+              </NavItem>
+            </SeccionNav>
           )}
         </nav>
 

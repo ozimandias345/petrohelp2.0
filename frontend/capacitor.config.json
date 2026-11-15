@@ -1,0 +1,19 @@
+{
+  "appId": "com.petrohelp.app",
+  "appName": "PetroHelp",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#111111",
+      "showSpinner": false
+    }
+  }
+}

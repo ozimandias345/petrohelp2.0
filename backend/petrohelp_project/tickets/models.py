@@ -93,6 +93,15 @@ class Usuario(AbstractUser):
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.rol})"
 
+    def save(self, *args, **kwargs):
+        # "activo" es el interruptor que usa la página de Usuarios. Se copia
+        # a is_active (el que Django revisa al iniciar sesión y al validar el
+        # token) para que un usuario desactivado de verdad no pueda entrar.
+        self.is_active = self.activo
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"is_active"}
+        super().save(*args, **kwargs)
+
 
 # =========================================================
 # TICKETS  (RF-03, RF-05, RF-06)

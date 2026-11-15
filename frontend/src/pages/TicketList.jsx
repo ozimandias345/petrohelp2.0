@@ -11,6 +11,9 @@ export default function TicketList() {
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState("recientes");
+  const [fEstado, setFEstado] = useState(""); // "" = todos
+  const [fPrioridad, setFPrioridad] = useState("");
+  const [fCategoria, setFCategoria] = useState("");
 
   // El admin_global no crea tickets: no tiene sentido que el
   // supervisor general reporte una incidencia sobre si mismo.
@@ -18,10 +21,14 @@ export default function TicketList() {
 
   useEffect(() => {
     cargarTickets();
+    // Recargar cuando PetroBot crea un ticket desde el chat
+    const recargar = () => cargarTickets(false);
+    window.addEventListener("petrohelp:tickets-actualizados", recargar);
+    return () => window.removeEventListener("petrohelp:tickets-actualizados", recargar);
   }, []);
 
-  function cargarTickets() {
-    setLoading(true);
+  function cargarTickets(mostrarCarga = true) {
+    if (mostrarCarga) setLoading(true);
     client
       .get("/tickets/")
       .then((res) => setTickets(res.data))
@@ -32,12 +39,45 @@ export default function TicketList() {
   const PRIORIDAD_PESO = { alta: 3, media: 2, baja: 1 };
   const ESTADO_PESO = { abierto: 1, en_proceso: 2, cerrado: 3 };
 
-  const filtrados = tickets
-    .filter(
-      (t) =>
-        t.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
-        t.estacion_nombre?.toLowerCase().includes(busqueda.toLowerCase())
-    )
+  // Categorías presentes en los tickets visibles (para el filtro)
+  const categorias = [...new Set(tickets.map((t) => t.categoria_nombre).filter(Boolean))].sort();
+
+  // Primero búsqueda + prioridad + categoría; el estado se aplica al final
+  // para poder mostrar cuántos tickets hay en cada pestaña.
+  const base = tickets.filter((t) => {
+    const q = busqueda.toLowerCase();
+    const coincide =
+      t.titulo.toLowerCase().includes(q) || t.estacion_nombre?.toLowerCase().includes(q);
+    return (
+      coincide &&
+      (!fPrioridad || t.prioridad === fPrioridad) &&
+      (!fCategoria || t.categoria_nombre === fCategoria)
+    );
+  });
+  const contar = (estado) => base.filter((t) => !estado || t.estado === estado).length;
+  const contarPrioridad = (prioridad) =>
+    tickets.filter((t) => {
+      const q = busqueda.toLowerCase();
+      const coincide =
+        t.titulo.toLowerCase().includes(q) || t.estacion_nombre?.toLowerCase().includes(q);
+      return (
+        coincide &&
+        (!fCategoria || t.categoria_nombre === fCategoria) &&
+        (!fEstado || t.estado === fEstado) &&
+        (!prioridad || t.prioridad === prioridad)
+      );
+    }).length;
+  const hayFiltros = busqueda || fEstado || fPrioridad || fCategoria;
+
+  function limpiarFiltros() {
+    setBusqueda("");
+    setFEstado("");
+    setFPrioridad("");
+    setFCategoria("");
+  }
+
+  const filtrados = base
+    .filter((t) => !fEstado || t.estado === fEstado)
     .sort((a, b) => {
       switch (orden) {
         case "antiguos":
@@ -73,7 +113,7 @@ export default function TicketList() {
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <input
           type="text"
           value={busqueda}
@@ -91,6 +131,85 @@ export default function TicketList() {
           <option value="prioridad">Prioridad (alta a baja)</option>
           <option value="estado">Estado (abierto a cerrado)</option>
         </select>
+      </div>
+
+      {/* Pestañas de estado */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="text-xs font-mono uppercase tracking-wide text-muted mr-1">Estado</span>
+        {[
+          ["", "Todos", "bg-ph-black text-ph-yellow border-ph-black"],
+          ["abierto", "Abiertos", "bg-danger text-white border-danger"],
+          ["en_proceso", "En proceso", "bg-warn text-white border-warn"],
+          ["cerrado", "Cerrados", "bg-success text-white border-success"],
+        ].map(([valor, texto, activo]) => (
+          <button
+            key={valor || "todos"}
+            type="button"
+            onClick={() => setFEstado(valor)}
+            className={`inline-flex items-center gap-2 text-sm font-medium px-3.5 py-1.5 rounded-full border transition-colors ${
+              fEstado === valor ? activo : "bg-surface border-border text-ink-soft hover:border-ph-yellow"
+            }`}
+          >
+            {texto}
+            <span
+              className={`text-xs font-mono px-1.5 rounded ${
+                fEstado === valor ? "bg-white/20" : "bg-surface-alt text-muted"
+              }`}
+            >
+              {contar(valor)}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Prioridad y categoría */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 mb-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-mono uppercase tracking-wide text-muted mr-1">Prioridad</span>
+          {[
+            ["", "Todas", "bg-ph-black text-ph-yellow border-ph-black"],
+            ["alta", "Alta", "bg-danger text-white border-danger"],
+            ["media", "Media", "bg-warn text-white border-warn"],
+            ["baja", "Baja", "bg-success text-white border-success"],
+          ].map(([valor, texto, activo]) => (
+            <button
+              key={valor || "todas"}
+              type="button"
+              onClick={() => setFPrioridad(valor)}
+              className={`inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                fPrioridad === valor ? activo : "bg-surface border-border text-ink-soft hover:border-ph-yellow"
+              }`}
+            >
+              {texto}
+              <span
+                className={`text-xs font-mono px-1.5 rounded ${
+                  fPrioridad === valor ? "bg-white/20" : "bg-surface-alt text-muted"
+                }`}
+              >
+                {contarPrioridad(valor)}
+              </span>
+            </button>
+          ))}
+        </div>
+        <select
+          value={fCategoria}
+          onChange={(e) => setFCategoria(e.target.value)}
+          className="bg-surface border border-border rounded-md px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ph-yellow sm:w-56"
+        >
+          <option value="">Todas las categorías</option>
+          {categorias.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        {hayFiltros && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="text-sm font-medium text-ink-soft hover:text-ph-black underline decoration-ph-yellow decoration-2 underline-offset-2 sm:ml-1 self-start sm:self-auto"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {error && <p className="text-danger text-sm mb-4">{error}</p>}

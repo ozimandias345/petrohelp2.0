@@ -10,6 +10,8 @@ dist/
 
 # ---------- Secretos y datos locales (NUNCA subir) ----------
 .env
+.env.*
+!.env.example
 *.db
 db.sqlite3
 backend/petrohelp_project/media/
@@ -21,3 +23,10 @@ backend/esp32_firmware/**/config.h
 Thumbs.db
 desktop.ini
 .vscode/
+
+# ---------- Android (Capacitor) ----------
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/local.properties
+*.apk

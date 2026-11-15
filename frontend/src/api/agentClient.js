@@ -2,7 +2,8 @@ import axios from "axios";
 
 // Cliente para el agente ESP32 (FastAPI, puerto 8001).
 // Usa el mismo token de Django: el agente lo valida contra /api/auth/me/.
-export const AGENT_BASE_URL = `http://${window.location.hostname}:8001/api`;
+export const AGENT_BASE_URL =
+  import.meta.env.VITE_AGENT_URL || `http://${window.location.hostname}:8001/api`;
 
 const agentClient = axios.create({ baseURL: AGENT_BASE_URL });
 

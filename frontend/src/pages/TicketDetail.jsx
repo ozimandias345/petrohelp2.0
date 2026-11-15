@@ -281,7 +281,7 @@ export default function TicketDetail() {
                     </p>
                     <p
                       className={`text-[10px] font-mono mt-1 text-right ${
-                        esPropio ? "text-white/70" : "text-muted"
+                        esPropio ? "text-ph-black/60" : "text-muted"
                       }`}
                     >
                       {new Date(c.fecha).toLocaleString("es-MX", {
