@@ -29,6 +29,36 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // El navegador comparte el almacenamiento entre TODAS las pestañas del
+  // mismo sitio, así que solo puede haber una sesión abierta a la vez.
+  // Si en otra pestaña se inicia o se cierra sesión, esta pestaña se
+  // sincroniza para no mezclar los datos de dos usuarios distintos
+  // (antes seguía mostrando un rol mientras el servidor ya respondía a otro).
+  useEffect(() => {
+    function alCambiarSesionEnOtraPestana(e) {
+      if (e.key && e.key !== "petrohelp_token" && e.key !== "petrohelp_user") return;
+
+      const token = localStorage.getItem("petrohelp_token");
+      if (!token) {
+        setUser(null); // cerraron sesión en otra pestaña
+        return;
+      }
+
+      let otro = null;
+      try {
+        const guardado = localStorage.getItem("petrohelp_user");
+        otro = guardado ? JSON.parse(guardado) : null;
+      } catch {
+        otro = null;
+      }
+      // Entraron con una cuenta distinta: se recarga para mostrarla completa.
+      if (otro && otro.id !== user?.id) window.location.reload();
+    }
+
+    window.addEventListener("storage", alCambiarSesionEnOtraPestana);
+    return () => window.removeEventListener("storage", alCambiarSesionEnOtraPestana);
+  }, [user]);
+
   async function login(username, password) {
     const res = await client.post("/auth/login/", { username, password });
     const { token } = res.data;
