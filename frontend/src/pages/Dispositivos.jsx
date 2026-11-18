@@ -130,7 +130,7 @@ export default function Dispositivos() {
         setError("");
       })
       .catch(() =>
-        setError("No se pudo conectar con el agente ESP32 (¿está corriendo en el puerto 8001?).")
+        setError("No se pudo conectar con el agente.")
       )
       .finally(() => setLoading(false));
   }

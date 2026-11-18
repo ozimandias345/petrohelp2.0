@@ -95,7 +95,7 @@ export default function ChatBot({ user }) {
     } catch (err) {
       const detalle =
         err.response?.data?.detail ||
-        "No pude conectar con el agente (¿está corriendo en el puerto 8001?).";
+        "No se pudo conectar con el agente.";
       setMensajes((prev) => [...prev, { role: "assistant", content: detalle, error: true }]);
     } finally {
       setEnviando(false);
