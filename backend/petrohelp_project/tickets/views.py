@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import (
+    CodigoRecuperacion,
     Departamento,
     Estacion,
     Categoria,
@@ -13,10 +14,17 @@ from .models import (
     HistorialTicket,
     Notificacion,
 )
+import secrets
+from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.mail import send_mail
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import ScopedRateThrottle
 from .serializers import (
     RegistroSerializer,
+    SolicitarCodigoSerializer,
+    RestablecerSerializer,
     DepartamentoSerializer,
     EstacionSerializer,
     CategoriaSerializer,
@@ -252,4 +260,127 @@ class RegistroView(APIView):
         return Response(
             {"token": token.key, "usuario": UsuarioSerializer(usuario).data},
             status=status.HTTP_201_CREATED,
+        )
+
+
+# =========================================================
+# RECUPERAR CONTRASENA POR CODIGO AL CORREO
+# =========================================================
+MAX_INTENTOS_CODIGO = 5
+
+# Respuesta unica para el paso 1: no decimos si el correo existe o no,
+# para que nadie pueda averiguar que cuentas hay en el sistema.
+RESPUESTA_GENERICA = {
+    "detail": "Si ese correo pertenece a una cuenta, enviamos un codigo de 6 digitos. "
+              "Revisa tu bandeja y la carpeta de spam."
+}
+
+
+class SolicitarCodigoView(APIView):
+    """Paso 1: genera un codigo de 6 digitos y lo manda al correo."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "codigo"
+
+    def post(self, request):
+        serializer = SolicitarCodigoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        correo = serializer.validated_data["email"].strip()
+
+        usuario = Usuario.objects.filter(email__iexact=correo, activo=True).first()
+        if usuario:
+            # Un codigo a la vez: los anteriores dejan de servir.
+            CodigoRecuperacion.objects.filter(usuario=usuario, usado=False).update(usado=True)
+
+            codigo = f"{secrets.randbelow(1000000):06d}"
+            minutos = getattr(settings, "CODIGO_VIGENCIA_MINUTOS", 15)
+            CodigoRecuperacion.objects.create(
+                usuario=usuario,
+                codigo_hash=make_password(codigo),
+                expira=timezone.now() + timezone.timedelta(minutes=minutos),
+            )
+
+            nombre = usuario.first_name or usuario.username
+            cuerpo = (
+                f"Hola {nombre}:\n\n"
+                f"Tu codigo para restablecer la contrasena de PetroHelp es:\n\n"
+                f"        {codigo}\n\n"
+                f"Vence en {minutos} minutos y solo se puede usar una vez.\n\n"
+                f"Si no pediste cambiar tu contrasena, ignora este mensaje: "
+                f"tu cuenta sigue igual.\n\n"
+                f"PetroHelp - Gestion preventiva para gasolineras"
+            )
+            try:
+                send_mail(
+                    subject="Tu codigo de PetroHelp",
+                    message=cuerpo,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[usuario.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                # El correo fallo (credenciales, red). No se lo contamos a
+                # quien pregunta, pero queda en el log del servidor.
+                import logging
+                logging.getLogger(__name__).exception("No se pudo enviar el codigo")
+
+        return Response(RESPUESTA_GENERICA, status=status.HTTP_200_OK)
+
+
+class RestablecerView(APIView):
+    """Paso 2: valida el codigo y guarda la contrasena nueva."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "codigo"
+
+    def post(self, request):
+        serializer = RestablecerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+
+        error = {"detail": "El codigo no es valido o ya vencio. Pide uno nuevo."}
+
+        usuario = Usuario.objects.filter(email__iexact=datos["email"].strip(), activo=True).first()
+        if not usuario:
+            return Response(error, status=status.HTTP_400_BAD_REQUEST)
+
+        registro = (
+            CodigoRecuperacion.objects
+            .filter(usuario=usuario, usado=False)
+            .order_by("-creado")
+            .first()
+        )
+        if not registro or registro.vencido:
+            return Response(error, status=status.HTTP_400_BAD_REQUEST)
+
+        if registro.intentos >= MAX_INTENTOS_CODIGO:
+            registro.usado = True
+            registro.save(update_fields=["usado"])
+            return Response(
+                {"detail": "Demasiados intentos fallidos. Pide un codigo nuevo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not check_password(datos["codigo"].strip(), registro.codigo_hash):
+            registro.intentos += 1
+            registro.save(update_fields=["intentos"])
+            restantes = MAX_INTENTOS_CODIGO - registro.intentos
+            return Response(
+                {"detail": f"Codigo incorrecto. Te quedan {restantes} intentos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        usuario.set_password(datos["password"])
+        usuario.save()
+        registro.usado = True
+        registro.save(update_fields=["usado"])
+
+        # Cerrar las sesiones abiertas: si alguien mas tenia el token, deja de servir.
+        Token.objects.filter(user=usuario).delete()
+
+        return Response(
+            {"detail": "Listo, tu contrasena se actualizo. Ya puedes iniciar sesion."},
+            status=status.HTTP_200_OK,
         )

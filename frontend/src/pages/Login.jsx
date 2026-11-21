@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import client from "../api/client";
 import logo from "../assets/petrohelp_logo.svg";
 
 const REMEMBER_KEY = "petrohelp_remember_user";
@@ -189,16 +190,23 @@ export default function Login() {
   const [apellido, setApellido] = useState("");
   const [correo, setCorreo] = useState("");
   const [password2, setPassword2] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [pasoRecuperar, setPasoRecuperar] = useState(1);
+  const [aviso, setAviso] = useState("");
   const { login, registrar } = useAuth();
   const navigate = useNavigate();
 
   const esRegistro = modo === "registro";
+  const esRecuperar = modo === "recuperar";
 
   function cambiarModo(nuevoModo) {
     setModo(nuevoModo);
     setError("");
+    setAviso("");
     setPassword("");
     setPassword2("");
+    setCodigo("");
+    setPasoRecuperar(1);
   }
 
   // El backend contesta los errores campo por campo; los juntamos en una
@@ -218,13 +226,32 @@ export default function Login() {
     e.preventDefault();
     setError("");
 
-    if (esRegistro && password !== password2) {
+    if ((esRegistro || (esRecuperar && pasoRecuperar === 2)) && password !== password2) {
       setError("Las dos contraseñas no coinciden.");
       return;
     }
 
     setLoading(true);
     try {
+      if (esRecuperar && pasoRecuperar === 1) {
+        // Paso 1: pedir el codigo al correo
+        const res = await client.post("/auth/recuperar/", { email: correo });
+        setAviso(res.data?.detail || "Revisa tu correo.");
+        setPasoRecuperar(2);
+        return;
+      }
+      if (esRecuperar) {
+        // Paso 2: codigo + contrasena nueva
+        await client.post("/auth/restablecer/", {
+          email: correo,
+          codigo,
+          password,
+          password2,
+        });
+        cambiarModo("entrar");
+        setAviso("Tu contrasena se actualizo. Ya puedes iniciar sesion.");
+        return;
+      }
       if (esRegistro) {
         await registrar({
           username,
@@ -249,7 +276,7 @@ export default function Login() {
         setError("No se pudo conectar con el servidor. Revisa que el backend esté encendido y que estés en la misma red.");
       } else if (err.response.status === 429) {
         setError("Se han creado demasiadas cuentas desde aquí. Espera un momento e intenta de nuevo.");
-      } else if (esRegistro && err.response.status === 400) {
+      } else if ((esRegistro || esRecuperar) && err.response.status === 400) {
         setError(mensajeDeError(err.response.data) || "Revisa los datos e intenta de nuevo.");
       } else if (err.response.status === 400 || err.response.status === 401) {
         setError("Usuario o contraseña incorrectos, o el usuario está desactivado.");
@@ -367,10 +394,18 @@ export default function Login() {
         {/* Saludo (escritorio) */}
         <div className="hidden lg:block mb-8">
           <h2 className="font-display text-4xl xl:text-5xl font-semibold text-ink tracking-wide">
-            {esRegistro ? "Crea tu cuenta" : "Bienvenido de nuevo"}
+            {esRecuperar
+              ? "Recupera tu acceso"
+              : esRegistro
+              ? "Crea tu cuenta"
+              : "Bienvenido de nuevo"}
           </h2>
           <p className="text-muted mt-2 text-base xl:text-lg">
-            {esRegistro
+            {esRecuperar
+              ? pasoRecuperar === 1
+                ? "Escribe tu correo y te enviamos un código de 6 dígitos."
+                : "Escribe el código que te llegó y tu contraseña nueva."
+              : esRegistro
               ? "Regístrate como operador para reportar incidencias de tu estación."
               : "Ingresa con tu usuario de PetroHelp para continuar."}
           </p>
@@ -396,170 +431,145 @@ export default function Login() {
               />
             </div>
 
-            <form onSubmit={handleSubmit} className={esRegistro ? "space-y-5" : "space-y-7"}>
+            <form onSubmit={handleSubmit} className={modo === "entrar" ? "space-y-7" : "space-y-5"}>
               {esRegistro && (
                 <div className="grid grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    required
-                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                    placeholder="Nombre"
-                  />
-                  <input
-                    type="text"
-                    value={apellido}
-                    onChange={(e) => setApellido(e.target.value)}
-                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                    placeholder="Apellido"
-                  />
+                  <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required
+                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors" placeholder="Nombre" />
+                  <input type="text" value={apellido} onChange={(e) => setApellido(e.target.value)}
+                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors" placeholder="Apellido" />
                 </div>
               )}
 
-              <div className="relative">
-                <span className="absolute left-0 bottom-3 text-muted/70">
-                  <UserIcon />
-                </span>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  autoFocus
-                  autoComplete="username"
-                  className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                  placeholder="Usuario"
-                />
-              </div>
-
-              {esRegistro && (
+              {!esRecuperar && (
                 <div className="relative">
-                  <span className="absolute left-0 bottom-3 text-muted/70">
-                    <MailIcon />
-                  </span>
-                  <input
-                    type="email"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                    placeholder="Correo (opcional)"
-                  />
+                  <span className="absolute left-0 bottom-3 text-muted/70"><UserIcon /></span>
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                    required autoFocus autoComplete="username"
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors" placeholder="Usuario" />
                 </div>
               )}
 
-              <div className="relative">
-                <span className="absolute left-0 bottom-3 text-muted/70">
-                  <LockIcon />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete={esRegistro ? "new-password" : "current-password"}
-                  className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-9 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                  placeholder="Contraseña"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  tabIndex={-1}
-                  className="absolute right-0 bottom-3 text-muted/70 hover:text-ink transition-colors"
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  <EyeIcon off={showPassword} />
-                </button>
-              </div>
-
-              {esRegistro && (
-                <>
-                  <div className="relative">
-                    <span className="absolute left-0 bottom-3 text-muted/70">
-                      <LockIcon />
-                    </span>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password2}
-                      onChange={(e) => setPassword2(e.target.value)}
-                      required
-                      autoComplete="new-password"
-                      className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
-                      placeholder="Repite la contraseña"
-                    />
-                  </div>
-                  <p className="text-xs text-muted leading-relaxed">
-                    Mínimo 8 caracteres. Tu cuenta se crea con permisos de{" "}
-                    <span className="font-semibold text-ink-soft">operador</span>: podrás
-                    registrar incidencias y dar seguimiento a las tuyas.
-                  </p>
-                </>
+              {(esRegistro || (esRecuperar && pasoRecuperar === 1)) && (
+                <div className="relative">
+                  <span className="absolute left-0 bottom-3 text-muted/70"><MailIcon /></span>
+                  <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)}
+                    required={esRecuperar} autoFocus={esRecuperar} autoComplete="email"
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                    placeholder={esRecuperar ? "Correo de tu cuenta" : "Correo (opcional)"} />
+                </div>
               )}
 
-              {!esRegistro && (
+              {esRecuperar && pasoRecuperar === 2 && (
+                <div className="relative">
+                  <span className="absolute left-0 bottom-3 text-muted/70"><LockIcon /></span>
+                  <input type="text" value={codigo} onChange={(e) => setCodigo(e.target.value)}
+                    required autoFocus inputMode="numeric" maxLength={6} autoComplete="one-time-code"
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors tracking-[0.5em] font-mono"
+                    placeholder="Código de 6 dígitos" />
+                </div>
+              )}
+
+              {(!esRecuperar || pasoRecuperar === 2) && (
+                <div className="relative">
+                  <span className="absolute left-0 bottom-3 text-muted/70"><LockIcon /></span>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete={modo === "entrar" ? "current-password" : "new-password"}
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-9 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                    placeholder={esRecuperar ? "Contraseña nueva" : "Contraseña"}
+                  />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                    className="absolute right-0 bottom-3 text-muted/70 hover:text-ink transition-colors"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                    <EyeIcon off={showPassword} />
+                  </button>
+                </div>
+              )}
+
+              {(esRegistro || (esRecuperar && pasoRecuperar === 2)) && (
+                <div className="relative">
+                  <span className="absolute left-0 bottom-3 text-muted/70"><LockIcon /></span>
+                  <input type={showPassword ? "text" : "password"} value={password2}
+                    onChange={(e) => setPassword2(e.target.value)} required autoComplete="new-password"
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors" placeholder="Repite la contraseña" />
+                </div>
+              )}
+
+              {esRegistro && (
+                <p className="text-xs text-muted leading-relaxed">
+                  Mínimo 8 caracteres. Tu cuenta se crea con permisos de{" "}
+                  <span className="font-semibold text-ink-soft">operador</span>: podrás
+                  registrar incidencias y dar seguimiento a las tuyas.
+                </p>
+              )}
+
+              {modo === "entrar" && (
                 <div className="flex items-center justify-between pt-1">
                   <label className="flex items-center gap-2.5 text-sm text-ink-soft cursor-pointer select-none">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={remember}
+                    <button type="button" role="switch" aria-checked={remember}
                       onClick={() => setRemember((v) => !v)}
                       className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${
                         remember ? "bg-ph-yellow" : "bg-border"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                      }`}>
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
                           remember ? "translate-x-4" : ""
-                        }`}
-                      />
+                        }`} />
                     </button>
                     Recordarme
                   </label>
-                  <span className="text-xs text-muted">
+                  <button type="button" onClick={() => cambiarModo("recuperar")}
+                    className="text-xs text-muted hover:text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 transition-colors">
                     ¿Problemas para entrar?
-                  </span>
+                  </button>
                 </div>
               )}
 
-              {error && (
-                <p className="text-sm text-danger font-medium">{error}</p>
-              )}
+              {aviso && <p className="text-sm text-success font-medium">{aviso}</p>}
+              {error && <p className="text-sm text-danger font-medium">{error}</p>}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-ph-yellow text-ph-black font-semibold rounded-lg py-3.5 text-lg hover:bg-ph-yellow-dark active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-sm shadow-ph-yellow/40"
-              >
+              <button type="submit" disabled={loading}
+                className="w-full bg-ph-yellow text-ph-black font-semibold rounded-lg py-3.5 text-lg hover:bg-ph-yellow-dark active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-sm shadow-ph-yellow/40">
                 {loading
-                  ? esRegistro
-                    ? "Creando cuenta…"
-                    : "Ingresando…"
+                  ? "Un momento…"
+                  : esRecuperar
+                  ? pasoRecuperar === 1
+                    ? "Enviarme el código"
+                    : "Guardar contraseña nueva"
                   : esRegistro
                   ? "Crear cuenta"
                   : "Ingresar"}
               </button>
 
+              {esRecuperar && pasoRecuperar === 2 && (
+                <button type="button" onClick={() => { setPasoRecuperar(1); setError(""); setAviso(""); }}
+                  className="w-full text-sm text-ink-soft hover:text-ink transition-colors">
+                  No me llegó el código, enviarlo otra vez
+                </button>
+              )}
+
               <div className="pt-1 text-center text-sm text-ink-soft">
-                {esRegistro ? (
+                {esRecuperar ? (
+                  <button type="button" onClick={() => cambiarModo("entrar")}
+                    className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors">
+                    Volver a iniciar sesión
+                  </button>
+                ) : esRegistro ? (
                   <>
                     ¿Ya tienes cuenta?{" "}
-                    <button
-                      type="button"
-                      onClick={() => cambiarModo("entrar")}
-                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors"
-                    >
+                    <button type="button" onClick={() => cambiarModo("entrar")}
+                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors">
                       Inicia sesión
                     </button>
                   </>
                 ) : (
                   <>
                     ¿Eres nuevo en PetroHelp?{" "}
-                    <button
-                      type="button"
-                      onClick={() => cambiarModo("registro")}
-                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors"
-                    >
+                    <button type="button" onClick={() => cambiarModo("registro")}
+                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors">
                       Crear cuenta
                     </button>
                   </>

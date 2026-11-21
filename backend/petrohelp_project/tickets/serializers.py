@@ -120,6 +120,30 @@ class RegistroSerializer(serializers.Serializer):
         return usuario
 
 
+class SolicitarCodigoSerializer(serializers.Serializer):
+    """Paso 1: la persona escribe su correo y le mandamos un codigo."""
+    email = serializers.EmailField()
+
+
+class RestablecerSerializer(serializers.Serializer):
+    """Paso 2: codigo recibido por correo mas la contrasena nueva."""
+    email = serializers.EmailField()
+    codigo = serializers.CharField(max_length=10)
+    password = serializers.CharField(write_only=True)
+    password2 = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data.get("password") != data.get("password2"):
+            raise serializers.ValidationError(
+                {"password2": "Las dos contrasenas no coinciden."}
+            )
+        try:
+            validar_contrasena(data.get("password"))
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"password": list(e.messages)})
+        return data
+
+
 class ComentarioTicketSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
 

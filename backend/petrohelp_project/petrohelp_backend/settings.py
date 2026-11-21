@@ -67,8 +67,34 @@ REST_FRAMEWORK = {
     # la base de usuarios desde la pantalla de registro.
     'DEFAULT_THROTTLE_RATES': {
         'registro': '20/hour',
+        'codigo': '10/hour',
     },
 }
+
+# =========================================================
+# CORREO  (codigos para recuperar la contrasena)
+# =========================================================
+# Si no hay credenciales, los correos se imprimen en la terminal en vez
+# de enviarse. Asi el sistema funciona aunque no haya cuenta de correo.
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = 20
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "PetroHelp <no-reply@petrohelp.local>"
+)
+
+# Minutos que dura un codigo de recuperacion antes de vencer.
+CODIGO_VIGENCIA_MINUTOS = int(os.getenv("CODIGO_VIGENCIA_MINUTOS", "15"))
+
 
 # Permite que el frontend de React (corriendo en localhost:5173)
 # le pueda hablar a esta API sin que el navegador lo bloquee.

@@ -239,3 +239,35 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"[{self.tipo}] Ticket #{self.ticket_id} -> {self.usuario}"
+
+
+# =========================================================
+# RECUPERACION DE CONTRASENA
+# =========================================================
+class CodigoRecuperacion(models.Model):
+    """
+    Codigo de un solo uso que se manda por correo cuando alguien olvida
+    su contrasena. Se guarda el hash, nunca el codigo en claro.
+    """
+    usuario = models.ForeignKey(
+        "Usuario", on_delete=models.CASCADE, related_name="codigos_recuperacion"
+    )
+    codigo_hash = models.CharField(max_length=128)
+    creado = models.DateTimeField(auto_now_add=True)
+    expira = models.DateTimeField()
+    usado = models.BooleanField(default=False)
+    intentos = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Codigo de recuperacion"
+        verbose_name_plural = "Codigos de recuperacion"
+        ordering = ["-creado"]
+
+    def __str__(self):
+        estado = "usado" if self.usado else "vigente"
+        return f"{self.usuario.username} ({estado})"
+
+    @property
+    def vencido(self):
+        from django.utils import timezone
+        return timezone.now() > self.expira
