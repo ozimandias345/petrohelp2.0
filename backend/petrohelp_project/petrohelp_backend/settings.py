@@ -63,6 +63,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Limite para el alta publica de cuentas: evita que alguien llene
+    # la base de usuarios desde la pantalla de registro.
+    'DEFAULT_THROTTLE_RATES': {
+        'registro': '20/hour',
+    },
 }
 
 # Permite que el frontend de React (corriendo en localhost:5173)

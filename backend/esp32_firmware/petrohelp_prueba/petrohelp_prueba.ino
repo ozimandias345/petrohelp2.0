@@ -25,16 +25,26 @@
  */
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <WiFiMulti.h>
 #include "config.h"
 
 // Prototipos (para no depender del orden de las funciones)
 void color(uint8_t r, uint8_t g, uint8_t b);
 void conectarWiFi();
+void listarRedes();
 void enviarLectura();
 void pitido(int ms);
 
 #define PIN_BOTON 0          // boton BOOT de la placa
 #define LECTURAS_FUGA 6      // cuantas lecturas dura la fuga simulada
+
+// Maneja la lista de redes de config.h y elige la que alcance.
+WiFiMulti wifiMulti;
+bool redesCargadas = false;
+
+// Cliente TLS para cuando AGENTE_URL es https (tunel de ngrok).
+WiFiClientSecure clienteSeguro;
 
 unsigned long ultimoEnvio = 0;
 int pasoFuga = 0;            // 0 = normal, >0 = fuga simulada en curso
@@ -45,25 +55,52 @@ void color(uint8_t r, uint8_t g, uint8_t b) {
   neopixelWrite(PIN_LED_RGB, r, g, b);
 }
 
+void listarRedes() {
+  Serial.println("Redes de 2.4 GHz que alcanza la placa:");
+  int n = WiFi.scanNetworks();
+  if (n <= 0) {
+    Serial.println("  (ninguna)");
+    return;
+  }
+  for (int i = 0; i < n && i < 15; i++) {
+    Serial.printf("  \"%s\"  %d dBm %s\n", WiFi.SSID(i).c_str(), WiFi.RSSI(i),
+                  WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "(abierta)" : "");
+  }
+  WiFi.scanDelete();
+}
+
 void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
-  Serial.printf("Conectando a la red \"%s\"", WIFI_SSID);
-  color(0, 0, 40);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
-    delay(500);
-    Serial.print(".");
+
+  if (!redesCargadas) {
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_STA);
+    for (int i = 0; i < WIFI_REDES_TOTAL; i++) {
+      wifiMulti.addAP(WIFI_REDES[i].ssid, WIFI_REDES[i].clave);
+      Serial.printf("Red configurada: \"%s\"\n", WIFI_REDES[i].ssid);
+    }
+    redesCargadas = true;
   }
-  Serial.println();
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Conectado. IP del ESP32: ");
+
+  Serial.print("Buscando una red conocida");
+  color(0, 0, 40);
+  // run() revisa cual de las redes de la lista esta al alcance y se
+  // conecta a la de mejor senal. 20 segundos de margen.
+  if (wifiMulti.run(20000) == WL_CONNECTED) {
+    Serial.println();
+    Serial.printf("Conectado a \"%s\"\n", WiFi.SSID().c_str());
+    Serial.print("IP del ESP32: ");
     Serial.println(WiFi.localIP());
+    Serial.printf("Senal: %d dBm\n", WiFi.RSSI());
     Serial.printf("Enviando lecturas a: %s\n", AGENTE_URL);
   } else {
-    Serial.println("No se pudo conectar. Revisa el nombre y la contrasena,");
-    Serial.println("y que la red sea de 2.4 GHz (el ESP32 no ve las de 5 GHz).");
+    Serial.println();
+    Serial.println("No se pudo conectar a ninguna de las redes configuradas.");
+    Serial.println("Revisa nombres y contrasenas, y que sean de 2.4 GHz");
+    Serial.println("(el ESP32 no ve las redes de 5 GHz).");
     color(40, 0, 40);
+    listarRedes();
+    delay(5000);   // no reintentar en bucle inmediato
   }
 }
 
@@ -93,9 +130,15 @@ void enviarLectura() {
   Serial.println(cuerpo);
 
   HTTPClient http;
-  http.begin(AGENTE_URL);
-  http.setTimeout(10000);
+  if (String(AGENTE_URL).startsWith("https")) {
+    clienteSeguro.setInsecure();   // sin validar certificado: suficiente aqui
+    http.begin(clienteSeguro, AGENTE_URL);
+  } else {
+    http.begin(AGENTE_URL);
+  }
+  http.setTimeout(15000);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("ngrok-skip-browser-warning", "true");
   http.addHeader("X-Device-Id", DEVICE_ID);
   http.addHeader("X-Device-Key", DEVICE_KEY);
   int codigo = http.POST(cuerpo);

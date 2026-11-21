@@ -70,6 +70,17 @@ export function AuthProvider({ children }) {
     return meRes.data;
   }
 
+  // Alta publica: el backend solo crea usuarios con rol operador y
+  // devuelve el token, asi que la persona entra de inmediato.
+  async function registrar(datos) {
+    const res = await client.post("/auth/registro/", datos);
+    const { token, usuario } = res.data;
+    localStorage.setItem("petrohelp_token", token);
+    setUser(usuario);
+    localStorage.setItem("petrohelp_user", JSON.stringify(usuario));
+    return usuario;
+  }
+
   function logout() {
     localStorage.removeItem("petrohelp_token");
     localStorage.removeItem("petrohelp_user");
@@ -77,7 +88,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, registrar, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

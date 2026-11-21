@@ -1,3 +1,5 @@
+from django.contrib.auth.password_validation import validate_password as validar_contrasena
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from .models import (
     Departamento,
@@ -65,6 +67,57 @@ class UsuarioSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class RegistroSerializer(serializers.Serializer):
+    """
+    Alta publica de cuentas desde la pantalla de inicio de sesion.
+
+    Siempre crea usuarios con rol OPERADOR. El rol no se puede elegir
+    desde aqui aunque venga en la peticion: asi nadie puede darse de
+    alta como administrador.
+    """
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True)
+    password2 = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+
+    def validate_username(self, valor):
+        valor = (valor or "").strip()
+        if not valor:
+            raise serializers.ValidationError("Escribe un nombre de usuario.")
+        if Usuario.objects.filter(username__iexact=valor).exists():
+            raise serializers.ValidationError("Ese nombre de usuario ya esta ocupado.")
+        return valor
+
+    def validate(self, data):
+        if data.get("password") != data.get("password2"):
+            raise serializers.ValidationError(
+                {"password2": "Las dos contrasenas no coinciden."}
+            )
+        try:
+            validar_contrasena(data.get("password"))
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"password": list(e.messages)})
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop("password2", None)
+        usuario = Usuario(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            rol=Usuario.Rol.OPERADOR,   # fijo
+            activo=True,
+            is_staff=False,
+            is_superuser=False,
+        )
+        usuario.set_password(validated_data["password"])
+        usuario.save()
+        return usuario
 
 
 class ComentarioTicketSerializer(serializers.ModelSerializer):

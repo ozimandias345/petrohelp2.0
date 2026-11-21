@@ -163,6 +163,15 @@ function EyeIcon({ off }) {
   );
 }
 
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-5 h-5">
+      <rect x="2.5" y="4.5" width="15" height="11" rx="2" />
+      <path d="m3 6 7 5 7-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Login() {
   const [username, setUsername] = useState(
     () => localStorage.getItem(REMEMBER_KEY) || ""
@@ -174,25 +183,74 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  // "entrar" = inicio de sesión · "registro" = alta de cuenta nueva
+  const [modo, setModo] = useState("entrar");
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [password2, setPassword2] = useState("");
+  const { login, registrar } = useAuth();
   const navigate = useNavigate();
+
+  const esRegistro = modo === "registro";
+
+  function cambiarModo(nuevoModo) {
+    setModo(nuevoModo);
+    setError("");
+    setPassword("");
+    setPassword2("");
+  }
+
+  // El backend contesta los errores campo por campo; los juntamos en una
+  // sola frase para no llenar la pantalla de mensajes sueltos.
+  function mensajeDeError(datos) {
+    if (!datos) return "";
+    if (typeof datos === "string") return datos;
+    const partes = [];
+    Object.values(datos).forEach((v) => {
+      if (Array.isArray(v)) partes.push(...v);
+      else if (typeof v === "string") partes.push(v);
+    });
+    return partes.join(" ");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+
+    if (esRegistro && password !== password2) {
+      setError("Las dos contraseñas no coinciden.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await login(username, password);
-      if (remember) {
-        localStorage.setItem(REMEMBER_KEY, username);
+      if (esRegistro) {
+        await registrar({
+          username,
+          password,
+          password2,
+          email: correo,
+          first_name: nombre,
+          last_name: apellido,
+        });
       } else {
-        localStorage.removeItem(REMEMBER_KEY);
+        await login(username, password);
+        if (remember) {
+          localStorage.setItem(REMEMBER_KEY, username);
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+        }
       }
       navigate("/");
     } catch (err) {
       // Sin respuesta del servidor = problema de conexión, no de contraseña.
       if (!err.response) {
         setError("No se pudo conectar con el servidor. Revisa que el backend esté encendido y que estés en la misma red.");
+      } else if (err.response.status === 429) {
+        setError("Se han creado demasiadas cuentas desde aquí. Espera un momento e intenta de nuevo.");
+      } else if (esRegistro && err.response.status === 400) {
+        setError(mensajeDeError(err.response.data) || "Revisa los datos e intenta de nuevo.");
       } else if (err.response.status === 400 || err.response.status === 401) {
         setError("Usuario o contraseña incorrectos, o el usuario está desactivado.");
       } else {
@@ -309,10 +367,12 @@ export default function Login() {
         {/* Saludo (escritorio) */}
         <div className="hidden lg:block mb-8">
           <h2 className="font-display text-4xl xl:text-5xl font-semibold text-ink tracking-wide">
-            Bienvenido de nuevo
+            {esRegistro ? "Crea tu cuenta" : "Bienvenido de nuevo"}
           </h2>
           <p className="text-muted mt-2 text-base xl:text-lg">
-            Ingresa con tu usuario de PetroHelp para continuar.
+            {esRegistro
+              ? "Regístrate como operador para reportar incidencias de tu estación."
+              : "Ingresa con tu usuario de PetroHelp para continuar."}
           </p>
         </div>
 
@@ -336,7 +396,27 @@ export default function Login() {
               />
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-7">
+            <form onSubmit={handleSubmit} className={esRegistro ? "space-y-5" : "space-y-7"}>
+              {esRegistro && (
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    required
+                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                    placeholder="Nombre"
+                  />
+                  <input
+                    type="text"
+                    value={apellido}
+                    onChange={(e) => setApellido(e.target.value)}
+                    className="w-full bg-transparent border-0 border-b-2 border-border py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                    placeholder="Apellido"
+                  />
+                </div>
+              )}
+
               <div className="relative">
                 <span className="absolute left-0 bottom-3 text-muted/70">
                   <UserIcon />
@@ -347,10 +427,26 @@ export default function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoFocus
+                  autoComplete="username"
                   className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
                   placeholder="Usuario"
                 />
               </div>
+
+              {esRegistro && (
+                <div className="relative">
+                  <span className="absolute left-0 bottom-3 text-muted/70">
+                    <MailIcon />
+                  </span>
+                  <input
+                    type="email"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                    placeholder="Correo (opcional)"
+                  />
+                </div>
+              )}
 
               <div className="relative">
                 <span className="absolute left-0 bottom-3 text-muted/70">
@@ -361,6 +457,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete={esRegistro ? "new-password" : "current-password"}
                   className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-9 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
                   placeholder="Contraseña"
                 />
@@ -375,29 +472,55 @@ export default function Login() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2.5 text-sm text-ink-soft cursor-pointer select-none">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={remember}
-                    onClick={() => setRemember((v) => !v)}
-                    className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${
-                      remember ? "bg-ph-yellow" : "bg-border"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                        remember ? "translate-x-4" : ""
-                      }`}
+              {esRegistro && (
+                <>
+                  <div className="relative">
+                    <span className="absolute left-0 bottom-3 text-muted/70">
+                      <LockIcon />
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password2}
+                      onChange={(e) => setPassword2(e.target.value)}
+                      required
+                      autoComplete="new-password"
+                      className="w-full bg-transparent border-0 border-b-2 border-border pl-8 pr-0 py-2.5 text-lg text-ink placeholder-muted/60 focus:outline-none focus:border-ph-yellow transition-colors"
+                      placeholder="Repite la contraseña"
                     />
-                  </button>
-                  Recordarme
-                </label>
-                <span className="text-xs text-muted">
-                  ¿Problemas para entrar?
-                </span>
-              </div>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Mínimo 8 caracteres. Tu cuenta se crea con permisos de{" "}
+                    <span className="font-semibold text-ink-soft">operador</span>: podrás
+                    registrar incidencias y dar seguimiento a las tuyas.
+                  </p>
+                </>
+              )}
+
+              {!esRegistro && (
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center gap-2.5 text-sm text-ink-soft cursor-pointer select-none">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={remember}
+                      onClick={() => setRemember((v) => !v)}
+                      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${
+                        remember ? "bg-ph-yellow" : "bg-border"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                          remember ? "translate-x-4" : ""
+                        }`}
+                      />
+                    </button>
+                    Recordarme
+                  </label>
+                  <span className="text-xs text-muted">
+                    ¿Problemas para entrar?
+                  </span>
+                </div>
+              )}
 
               {error && (
                 <p className="text-sm text-danger font-medium">{error}</p>
@@ -408,8 +531,40 @@ export default function Login() {
                 disabled={loading}
                 className="w-full bg-ph-yellow text-ph-black font-semibold rounded-lg py-3.5 text-lg hover:bg-ph-yellow-dark active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-sm shadow-ph-yellow/40"
               >
-                {loading ? "Ingresando…" : "Ingresar"}
+                {loading
+                  ? esRegistro
+                    ? "Creando cuenta…"
+                    : "Ingresando…"
+                  : esRegistro
+                  ? "Crear cuenta"
+                  : "Ingresar"}
               </button>
+
+              <div className="pt-1 text-center text-sm text-ink-soft">
+                {esRegistro ? (
+                  <>
+                    ¿Ya tienes cuenta?{" "}
+                    <button
+                      type="button"
+                      onClick={() => cambiarModo("entrar")}
+                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors"
+                    >
+                      Inicia sesión
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    ¿Eres nuevo en PetroHelp?{" "}
+                    <button
+                      type="button"
+                      onClick={() => cambiarModo("registro")}
+                      className="font-semibold text-ink underline decoration-ph-yellow decoration-2 underline-offset-4 hover:text-ph-yellow-dark transition-colors"
+                    >
+                      Crear cuenta
+                    </button>
+                  </>
+                )}
+              </div>
             </form>
           </div>
         </div>

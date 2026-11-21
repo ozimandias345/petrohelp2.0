@@ -13,7 +13,10 @@ from .models import (
     HistorialTicket,
     Notificacion,
 )
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import ScopedRateThrottle
 from .serializers import (
+    RegistroSerializer,
     DepartamentoSerializer,
     EstacionSerializer,
     CategoriaSerializer,
@@ -226,3 +229,27 @@ class MeView(APIView):
     def get(self, request):
         serializer = UsuarioSerializer(request.user)
         return Response(serializer.data)
+
+
+class RegistroView(APIView):
+    """
+    Alta publica de cuentas desde la pantalla de inicio de sesion.
+
+    Solo crea usuarios con rol "operador": quien se registra aqui puede
+    reportar incidencias y ver las suyas, nada mas. Devuelve el token
+    para que entre de inmediato, sin tener que escribir sus datos otra vez.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "registro"
+
+    def post(self, request):
+        serializer = RegistroSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        usuario = serializer.save()
+        token, _ = Token.objects.get_or_create(user=usuario)
+        return Response(
+            {"token": token.key, "usuario": UsuarioSerializer(usuario).data},
+            status=status.HTTP_201_CREATED,
+        )
