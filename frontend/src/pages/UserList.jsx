@@ -23,6 +23,7 @@ const EDIT_VACIO = { first_name: "", last_name: "", email: "", password: "" };
 export default function UserList() {
   const [usuarios, setUsuarios] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
+  const [estaciones, setEstaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [guardandoId, setGuardandoId] = useState(null);
@@ -37,6 +38,7 @@ export default function UserList() {
   useEffect(() => {
     cargar();
     client.get("/departamentos/").then((res) => setDepartamentos(res.data));
+    client.get("/estaciones/").then((res) => setEstaciones(res.data));
   }, []);
 
   function cargar() {
@@ -144,7 +146,7 @@ export default function UserList() {
       {error && <p className="text-danger text-sm mb-4">{error}</p>}
 
       <div className="bg-surface border border-border rounded-lg overflow-x-auto shadow-sm">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="w-full text-sm min-w-[760px]">
           <thead>
             <tr className="bg-surface-alt border-b border-border text-left">
               <th className="px-4 py-3 font-mono text-xs uppercase tracking-wide text-muted">
@@ -155,6 +157,9 @@ export default function UserList() {
               </th>
               <th className="px-4 py-3 font-mono text-xs uppercase tracking-wide text-muted">
                 Departamento
+              </th>
+              <th className="px-4 py-3 font-mono text-xs uppercase tracking-wide text-muted">
+                Estación
               </th>
               <th className="px-4 py-3 font-mono text-xs uppercase tracking-wide text-muted">
                 Activo
@@ -235,6 +240,29 @@ export default function UserList() {
                         {d.nombre}
                       </option>
                     ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={u.estacion || ""}
+                    disabled={guardandoId === u.id}
+                    onChange={(e) =>
+                      actualizarCampo(
+                        u,
+                        "estacion",
+                        e.target.value ? Number(e.target.value) : null
+                      )
+                    }
+                    className="bg-surface-alt border border-border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ph-yellow"
+                  >
+                    <option value="">— Sin asignar —</option>
+                    {estaciones
+                      .filter((e) => e.activa !== false)
+                      .map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre}
+                        </option>
+                      ))}
                   </select>
                 </td>
                 <td className="px-4 py-3">

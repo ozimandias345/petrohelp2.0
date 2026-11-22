@@ -35,13 +35,15 @@ class CategoriaSerializer(serializers.ModelSerializer):
 
 class UsuarioSerializer(serializers.ModelSerializer):
     departamento_nombre = serializers.CharField(source="departamento.nombre", read_only=True)
+    estacion_nombre = serializers.CharField(source="estacion.nombre", read_only=True)
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Usuario
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "rol", "departamento", "departamento_nombre", "activo", "password",
+            "rol", "departamento", "departamento_nombre",
+            "estacion", "estacion_nombre", "activo", "password",
         ]
 
     def validate(self, data):

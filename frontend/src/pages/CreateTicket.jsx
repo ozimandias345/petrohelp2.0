@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 // Baja = verde, Media = amarillo, Alta = rojo: mismo código de color
 // que ya se usa en los badges de prioridad del resto de la app.
@@ -27,11 +28,20 @@ export default function CreateTicket() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     client.get("/categorias/").then((res) => setCategorias(res.data));
     client.get("/estaciones/").then((res) => setEstaciones(res.data));
   }, []);
+
+  // Si la persona tiene una estación asignada, viene seleccionada de entrada:
+  // casi siempre reporta incidencias de la estación donde trabaja.
+  useEffect(() => {
+    if (user?.estacion) {
+      setForm((prev) => (prev.estacion ? prev : { ...prev, estacion: String(user.estacion) }));
+    }
+  }, [user]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });

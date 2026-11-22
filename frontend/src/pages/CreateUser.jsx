@@ -4,6 +4,7 @@ import client from "../api/client";
 
 export default function CreateUser() {
   const [departamentos, setDepartamentos] = useState([]);
+  const [estaciones, setEstaciones] = useState([]);
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -12,6 +13,7 @@ export default function CreateUser() {
     password: "",
     rol: "operador",
     departamento: "",
+    estacion: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,7 @@ export default function CreateUser() {
 
   useEffect(() => {
     client.get("/departamentos/").then((res) => setDepartamentos(res.data));
+    client.get("/estaciones/").then((res) => setEstaciones(res.data));
   }, []);
 
   function handleChange(e) {
@@ -33,6 +36,7 @@ export default function CreateUser() {
       await client.post("/usuarios/", {
         ...form,
         departamento: form.departamento ? Number(form.departamento) : null,
+        estacion: form.estacion ? Number(form.estacion) : null,
       });
       navigate("/usuarios");
     } catch (err) {
@@ -54,7 +58,7 @@ export default function CreateUser() {
         Nuevo usuario
       </h1>
       <p className="text-sm text-muted mb-6">
-        Se le podrá asignar un rol y departamento en cualquier momento desde la lista.
+        Se le podrá cambiar el rol, el departamento y la estación en cualquier momento desde la lista.
       </p>
 
       <form
@@ -164,6 +168,30 @@ export default function CreateUser() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-mono uppercase tracking-wide text-muted mb-2">
+              Estación
+            </label>
+            <select
+              name="estacion"
+              value={form.estacion}
+              onChange={handleChange}
+              className="w-full bg-surface-alt border border-border rounded-md px-3.5 py-2.5 text-ink focus:outline-none focus:ring-2 focus:ring-ph-yellow"
+            >
+              <option value="">— Sin asignar —</option>
+              {estaciones
+                .filter((e) => e.activa !== false)
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-muted mt-1.5">
+              La estación donde trabaja. Al registrar una incidencia aparecerá
+              seleccionada por defecto.
+            </p>
           </div>
         </div>
 

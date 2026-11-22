@@ -84,6 +84,15 @@ class Usuario(AbstractUser):
         blank=True,
         related_name="usuarios"
     )
+    estacion = models.ForeignKey(
+        Estacion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuarios",
+        help_text="Estacion donde trabaja. Se usa como estacion sugerida "
+                  "al registrar una incidencia.",
+    )
     activo = models.BooleanField(default=True)  # activar/desactivar (RF-10)
 
     class Meta:
