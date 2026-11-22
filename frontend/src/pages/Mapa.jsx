@@ -59,6 +59,11 @@ export default function Mapa() {
   const [seleccion, setSeleccion] = useState(null);
   const [ubicando, setUbicando] = useState(null); // estación que se está colocando
   const [guardando, setGuardando] = useState(false);
+  // Alta de una estación nueva desde el propio mapa
+  const [mostrarAlta, setMostrarAlta] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevaDireccion, setNuevaDireccion] = useState("");
+  const [creando, setCreando] = useState(false);
 
   const divMapa = useRef(null);
   const mapa = useRef(null);
@@ -202,6 +207,34 @@ export default function Mapa() {
     }
   }
 
+  // Crea la estación y entra de inmediato en modo "colocar en el mapa".
+  async function crearEstacion(ev) {
+    ev.preventDefault();
+    const nombre = nuevoNombre.trim();
+    if (!nombre) return;
+    setCreando(true);
+    setError("");
+    try {
+      const res = await client.post("/estaciones/", {
+        nombre,
+        direccion: nuevaDireccion.trim() || null,
+        activa: true,
+      });
+      setEstaciones((prev) => [...prev, res.data]);
+      setNuevoNombre("");
+      setNuevaDireccion("");
+      setMostrarAlta(false);
+      setUbicando({ ...res.data, lat: null, lng: null });
+    } catch (err) {
+      const d = err.response?.data;
+      setError(
+        d?.nombre?.[0] || d?.detail || "No se pudo crear la estación."
+      );
+    } finally {
+      setCreando(false);
+    }
+  }
+
   if (loading) return <Spinner full />;
 
   const conteo = (est) => info.filter((e) => e.estado === est).length;
@@ -247,7 +280,44 @@ export default function Mapa() {
 
         <div className="bg-surface border border-border rounded-lg flex flex-col max-h-[70vh]">
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs font-mono uppercase tracking-wide text-muted">{info.length} estaciones</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-mono uppercase tracking-wide text-muted">{info.length} estaciones</p>
+              {esGlobal && (
+                <button
+                  onClick={() => { setMostrarAlta((v) => !v); setError(""); }}
+                  className="text-xs font-semibold text-ph-black bg-ph-yellow hover:bg-ph-yellow-dark rounded-md px-2.5 py-1 transition-colors"
+                >
+                  {mostrarAlta ? "Cancelar" : "+ Nueva estación"}
+                </button>
+              )}
+            </div>
+
+            {esGlobal && mostrarAlta && (
+              <form onSubmit={crearEstacion} className="mt-3 space-y-2">
+                <input
+                  value={nuevoNombre}
+                  onChange={(e) => setNuevoNombre(e.target.value)}
+                  autoFocus
+                  placeholder="Nombre de la estación"
+                  className="w-full bg-surface-alt border border-border rounded-md px-3 py-2 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-2 focus:ring-ph-yellow"
+                />
+                <input
+                  value={nuevaDireccion}
+                  onChange={(e) => setNuevaDireccion(e.target.value)}
+                  placeholder="Dirección (opcional)"
+                  className="w-full bg-surface-alt border border-border rounded-md px-3 py-2 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-2 focus:ring-ph-yellow"
+                />
+                <button
+                  disabled={creando || !nuevoNombre.trim()}
+                  className="w-full bg-ph-black text-ph-yellow font-semibold text-sm rounded-md py-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {creando ? "Creando…" : "Crear y ubicar en el mapa"}
+                </button>
+                <p className="text-xs text-muted leading-snug">
+                  Al crearla, haz clic en el mapa para marcar dónde está.
+                </p>
+              </form>
+            )}
           </div>
           <div className="overflow-y-auto divide-y divide-border">
             {info.map((e) => (

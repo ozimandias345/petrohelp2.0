@@ -60,7 +60,9 @@ float leerNivelTanque() {
 
 void indicarAlerta(bool activa, const char* severidad) {
   alertaActiva = activa;
-  digitalWrite(PIN_LED, activa ? HIGH : LOW);
+  // LED RGB de la placa: rojo si hay alerta, verde si todo bien.
+  if (activa) neopixelWrite(PIN_LED_RGB, 60, 0, 0);
+  else        neopixelWrite(PIN_LED_RGB, 0, 40, 0);
   if (activa) {
     int pitidos = (severidad && strcmp(severidad, "alta") == 0) ? 5 : 2;
     for (int i = 0; i < pitidos; i++) {
@@ -118,7 +120,6 @@ void setup() {
   pinMode(PIN_TRIG, OUTPUT);
   pinMode(PIN_ECHO, INPUT);
   pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED, OUTPUT);
   analogReadResolution(12);
   dht.begin();
   Serial.println("PetroHelp sensor iniciando (MQ-2 necesita ~1 min de calentamiento)");

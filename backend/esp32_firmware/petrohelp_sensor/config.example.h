@@ -16,12 +16,15 @@
 #define INTERVALO_MS  30000
 
 // --- Pines ---
-#define PIN_DHT       4    // DHT22 (temperatura)
-#define PIN_MQ2       34   // MQ-2 salida analógica (ADC1, solo entrada)
-#define PIN_TRIG      5    // HC-SR04 trigger
-#define PIN_ECHO      18   // HC-SR04 echo (usar divisor de voltaje 5V -> 3.3V)
-#define PIN_BUZZER    25
-#define PIN_LED       2    // LED integrado en la mayoría de placas
+// Pines elegidos para la placa ESP32-S3-DevKitC-1 (modulo WROOM-1 N16R8).
+// OJO: en esta placa los GPIO 33 a 37 los ocupa la PSRAM y NO se pueden usar.
+// Las entradas analogicas validas son del GPIO 1 al 10 (ADC1).
+#define PIN_DHT       4    // DHT22 (temperatura y humedad)
+#define PIN_MQ2       5    // MQ-2 salida analogica (ADC1; usar divisor 5V -> 3.3V)
+#define PIN_TRIG      6    // HC-SR04 trigger
+#define PIN_ECHO      7    // HC-SR04 echo (usar divisor de voltaje 5V -> 3.3V)
+#define PIN_BUZZER    15   // buzzer activo (opcional)
+#define PIN_LED_RGB   48   // LED RGB integrado de la placa
 
 // --- Tanque (para convertir distancia del ultrasónico a %) ---
 #define ALTURA_TANQUE_CM  100.0   // distancia del sensor al fondo del tanque
