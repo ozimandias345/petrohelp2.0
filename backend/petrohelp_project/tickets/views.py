@@ -36,12 +36,7 @@ from .serializers import (
     HistorialTicketSerializer,
     NotificacionSerializer,
 )
-from .permissions import (
-    TicketPermission,
-    EsAdminGlobalOSoloLectura,
-    EsAdminGlobal,
-    EsAdminGlobalOJefeSoloLectura,
-)
+from .permissions import TicketPermission, EsAdminGlobalOSoloLectura, EsAdminGlobal
 
 
 class DepartamentoViewSet(viewsets.ModelViewSet):
@@ -100,15 +95,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.select_related("departamento", "estacion").all()
     serializer_class = UsuarioSerializer
-    permission_classes = [EsAdminGlobalOJefeSoloLectura]
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        # El jefe de departamento solo ve a la gente de su propia area.
-        if user.rol == "admin_departamento":
-            return qs.filter(departamento_id=user.departamento_id)
-        return qs
+    permission_classes = [EsAdminGlobal]
 
     def destroy(self, request, *args, **kwargs):
         # Usuario.tickets_creados, comentarios e historial usan on_delete=PROTECT

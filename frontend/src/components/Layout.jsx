@@ -6,9 +6,7 @@ import {
   TicketIcon,
   PlusCircleIcon,
   ChartIcon,
-  InboxIcon,
   StationIcon,
-  LogIcon,
   UsersIcon,
   BuildingIcon,
   TagIcon,
@@ -168,9 +166,6 @@ export default function Layout() {
 
           {isAdmin && (
             <SeccionNav titulo="Monitoreo">
-              <NavItem to="/cola" icon={<InboxIcon />} onNavigate={cerrarMenu}>
-                Cola de trabajo
-              </NavItem>
               <NavItem to="/dashboard" icon={<ChartIcon />} onNavigate={cerrarMenu}>
                 Dashboard
               </NavItem>
@@ -190,9 +185,6 @@ export default function Layout() {
               </NavItem>
               <NavItem to="/estaciones" icon={<StationIcon />} onNavigate={cerrarMenu}>
                 Estaciones
-              </NavItem>
-              <NavItem to="/auditoria" icon={<LogIcon />} onNavigate={cerrarMenu}>
-                Bitácora
               </NavItem>
               <NavItem to="/categorias" icon={<TagIcon />} onNavigate={cerrarMenu}>
                 Categorías
