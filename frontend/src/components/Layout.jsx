@@ -6,6 +6,9 @@ import {
   TicketIcon,
   PlusCircleIcon,
   ChartIcon,
+  InboxIcon,
+  StationIcon,
+  LogIcon,
   UsersIcon,
   BuildingIcon,
   TagIcon,
@@ -165,6 +168,9 @@ export default function Layout() {
 
           {isAdmin && (
             <SeccionNav titulo="Monitoreo">
+              <NavItem to="/cola" icon={<InboxIcon />} onNavigate={cerrarMenu}>
+                Cola de trabajo
+              </NavItem>
               <NavItem to="/dashboard" icon={<ChartIcon />} onNavigate={cerrarMenu}>
                 Dashboard
               </NavItem>
@@ -182,6 +188,12 @@ export default function Layout() {
               <NavItem to="/departamentos" icon={<BuildingIcon />} onNavigate={cerrarMenu}>
                 Departamentos
               </NavItem>
+              <NavItem to="/estaciones" icon={<StationIcon />} onNavigate={cerrarMenu}>
+                Estaciones
+              </NavItem>
+              <NavItem to="/auditoria" icon={<LogIcon />} onNavigate={cerrarMenu}>
+                Bitácora
+              </NavItem>
               <NavItem to="/categorias" icon={<TagIcon />} onNavigate={cerrarMenu}>
                 Categorías
               </NavItem>
@@ -190,7 +202,16 @@ export default function Layout() {
         </nav>
 
         <div className="px-4 py-4 border-t border-white/10">
-          <div className="flex items-center gap-2.5 mb-3.5">
+          <NavLink
+            to="/perfil"
+            onClick={cerrarMenu}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 mb-3.5 rounded-md px-2 py-1.5 -mx-2 transition-colors ${
+                isActive ? "bg-white/10" : "hover:bg-white/5"
+              }`
+            }
+            title="Mi perfil"
+          >
             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-semibold font-display shrink-0">
               {(user?.first_name || user?.username || "?").charAt(0).toUpperCase()}
             </div>
@@ -202,7 +223,7 @@ export default function Layout() {
                 <RolBadge rol={user?.rol} />
               </div>
             </div>
-          </div>
+          </NavLink>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 text-left text-xs font-medium text-white/50 hover:text-ph-yellow transition-colors font-mono uppercase tracking-wide"

@@ -28,6 +28,34 @@ export function PlusCircleIcon(props) {
   );
 }
 
+export function InboxIcon(props) {
+  return (
+    <svg {...base} className="w-[18px] h-[18px]" {...props}>
+      <path d="M3 13.5 5.5 4.5h13L21 13.5v5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5v-5Z" />
+      <path d="M3 13.5h5a4 4 0 0 0 8 0h5" />
+    </svg>
+  );
+}
+
+export function StationIcon(props) {
+  return (
+    <svg {...base} className="w-[18px] h-[18px]" {...props}>
+      <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16" />
+      <path d="M3 21h13M7 8h4" />
+      <path d="M14 10h3a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0v-7l-2-2.5" />
+    </svg>
+  );
+}
+
+export function LogIcon(props) {
+  return (
+    <svg {...base} className="w-[18px] h-[18px]" {...props}>
+      <path d="M5 4h14v16H5z" />
+      <path d="M9 9h6M9 13h6M9 17h3" />
+    </svg>
+  );
+}
+
 export function ChartIcon(props) {
   return (
     <svg {...base} className="w-[18px] h-[18px]" {...props}>

@@ -50,4 +50,18 @@ def cargar_dispositivos() -> dict:
     return {d["device_id"]: d for d in datos}
 
 
+def guardar_dispositivos(lista: list) -> None:
+    """Reescribe dispositivos.json y recarga la configuracion en memoria."""
+    global DISPOSITIVOS
+    DISPOSITIVOS_PATH.write_text(
+        json.dumps(lista, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    DISPOSITIVOS = {d["device_id"]: d for d in lista}
+
+
+def lista_dispositivos() -> list:
+    """Los dispositivos como lista, en el orden del archivo."""
+    return list(DISPOSITIVOS.values())
+
+
 DISPOSITIVOS = cargar_dispositivos()

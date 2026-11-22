@@ -81,6 +81,19 @@ export function AuthProvider({ children }) {
     return usuario;
   }
 
+  // Vuelve a pedir los datos del usuario (tras editar el perfil).
+  async function refrescarUsuario() {
+    const res = await client.get("/auth/me/");
+    setUser(res.data);
+    localStorage.setItem("petrohelp_user", JSON.stringify(res.data));
+    return res.data;
+  }
+
+  // Al cambiar la contrasena el servidor emite un token nuevo.
+  function guardarToken(token) {
+    if (token) localStorage.setItem("petrohelp_token", token);
+  }
+
   function logout() {
     localStorage.removeItem("petrohelp_token");
     localStorage.removeItem("petrohelp_user");
@@ -88,7 +101,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, registrar, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, registrar, refrescarUsuario, guardarToken, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

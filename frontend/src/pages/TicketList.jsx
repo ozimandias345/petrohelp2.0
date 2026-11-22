@@ -18,6 +18,7 @@ export default function TicketList() {
   // El admin_global no crea tickets: no tiene sentido que el
   // supervisor general reporte una incidencia sobre si mismo.
   const puedeCrearTicket = user?.rol !== "admin_global";
+  const esOperador = user?.rol === "operador";
 
   useEffect(() => {
     cargarTickets();
@@ -112,6 +113,8 @@ export default function TicketList() {
           </Link>
         )}
       </div>
+
+      {esOperador && <ResumenOperador tickets={tickets} user={user} />}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <input
@@ -254,6 +257,65 @@ export default function TicketList() {
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Resumen de bienvenida para el operador: al entrar quiere saber en qué
+// van sus reportes, no ver una lista con filtros.
+function ResumenOperador({ tickets, user }) {
+  const abiertos = tickets.filter((t) => t.estado === "abierto").length;
+  const enProceso = tickets.filter((t) => t.estado === "en_proceso").length;
+  const cerrados = tickets.filter((t) => t.estado === "cerrado").length;
+  const sinAtender = tickets.filter((t) => t.estado === "abierto" && !t.asignado_a).length;
+
+  const hora = new Date().getHours();
+  const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
+  const nombre = user?.first_name || user?.username;
+
+  return (
+    <div className="bg-surface-sidebar text-white rounded-lg p-5 mb-5 relative overflow-hidden">
+      <div className="hazard-stripes absolute top-0 inset-x-0 h-1.5" />
+      <div className="flex flex-wrap items-center justify-between gap-4 mt-1">
+        <div>
+          <p className="font-display text-xl font-semibold tracking-wide">
+            {saludo}, {nombre}.
+          </p>
+          <p className="text-sm text-white/60 mt-1">
+            {tickets.length === 0
+              ? "Todavía no has reportado ninguna incidencia."
+              : enProceso > 0
+              ? `Hay ${enProceso} de tus reportes en atención ahora mismo.`
+              : abiertos > 0
+              ? `Tienes ${abiertos} reporte(s) esperando a que alguien los tome.`
+              : "Todos tus reportes están cerrados."}
+          </p>
+        </div>
+
+        <div className="flex gap-5">
+          {[
+            ["Abiertos", abiertos, "text-ph-yellow"],
+            ["En proceso", enProceso, "text-white"],
+            ["Cerrados", cerrados, "text-success"],
+          ].map(([etiqueta, valor, color]) => (
+            <div key={etiqueta} className="text-center">
+              <p className={`font-display text-3xl font-semibold ${color}`}>{valor}</p>
+              <p className="text-[11px] font-mono uppercase tracking-wide text-white/50 mt-0.5">
+                {etiqueta}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {sinAtender > 0 && (
+        <p className="text-xs text-white/50 mt-4 border-t border-white/10 pt-3">
+          {sinAtender === 1
+            ? "Uno de tus reportes aún no tiene responsable asignado."
+            : `${sinAtender} de tus reportes aún no tienen responsable asignado.`}{" "}
+          Si es urgente, avisa a tu supervisor.
+        </p>
+      )}
     </div>
   );
 }

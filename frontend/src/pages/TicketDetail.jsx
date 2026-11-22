@@ -316,32 +316,108 @@ export default function TicketDetail() {
         </div>
       </div>
 
-      {/* Historial */}
-      <div>
-        <p className="text-xs font-mono uppercase tracking-wide text-muted mb-3">
-          Historial de cambios
+      {/* Línea de tiempo */}
+      <LineaDeTiempo ticket={ticket} />
+    </div>
+  );
+}
+
+
+// Línea de tiempo del ticket: en vez de una lista de cambios sueltos,
+// muestra cuánto duró cada etapa. Es lo que de verdad quiere saber
+// quien reportó: "¿cuánto llevo esperando?".
+const NOMBRE_ESTADO = { abierto: "Abierto", en_proceso: "En proceso", cerrado: "Cerrado" };
+const PUNTO_ESTADO = { abierto: "bg-danger", en_proceso: "bg-warn", cerrado: "bg-success" };
+
+function duracion(desde, hasta) {
+  const ms = (hasta ? new Date(hasta) : new Date()) - new Date(desde);
+  if (ms < 0) return "";
+  const minutos = Math.floor(ms / 60000);
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return horas === 1 ? "1 hora" : `${horas} horas`;
+  const dias = Math.floor(horas / 24);
+  return dias === 1 ? "1 día" : `${dias} días`;
+}
+
+function LineaDeTiempo({ ticket }) {
+  const historial = [...(ticket.historial || [])].sort(
+    (a, b) => new Date(a.fecha) - new Date(b.fecha)
+  );
+
+  // Cada etapa: estado, cuándo empezó, quién la provocó.
+  const etapas = [
+    {
+      estado: "abierto",
+      fecha: ticket.fecha_registro,
+      quien: ticket.creado_por_nombre,
+      texto: "Se registró la incidencia",
+    },
+    ...historial.map((h) => ({
+      estado: h.estado_nuevo,
+      fecha: h.fecha,
+      quien: h.usuario_nombre,
+      texto: `Pasó a ${(NOMBRE_ESTADO[h.estado_nuevo] || h.estado_nuevo).toLowerCase()}`,
+    })),
+  ];
+
+  const abierta = ticket.estado !== "cerrado";
+
+  return (
+    <div>
+      <p className="text-xs font-mono uppercase tracking-wide text-muted mb-4">
+        Línea de tiempo
+      </p>
+
+      <ol className="relative border-l-2 border-border ml-1.5 space-y-5">
+        {etapas.map((e, i) => {
+          const siguiente = etapas[i + 1];
+          const dur = duracion(e.fecha, siguiente?.fecha);
+          const esUltima = i === etapas.length - 1;
+          return (
+            <li key={`${e.fecha}-${i}`} className="pl-5 relative">
+              <span
+                className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full ring-2 ring-surface ${
+                  PUNTO_ESTADO[e.estado] || "bg-muted"
+                }`}
+              />
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-sm font-medium text-ink">{e.texto}</span>
+                {e.quien && <span className="text-xs text-muted">por {e.quien}</span>}
+              </div>
+              <p className="text-xs text-muted font-mono mt-0.5">
+                {new Date(e.fecha).toLocaleString("es-MX")}
+              </p>
+              {dur && (
+                <p className="text-xs text-ink-soft mt-1">
+                  {esUltima ? "" : `Duró ${dur} en esta etapa`}
+                </p>
+              )}
+              {esUltima && abierta && (
+                <p className="text-xs text-warn font-medium mt-1">
+                  Lleva {duracion(e.fecha)} así
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {ticket.estado === "cerrado" && ticket.fecha_cierre && (
+        <p className="text-sm text-ink-soft mt-5 pl-1">
+          Se resolvió en{" "}
+          <span className="font-semibold text-ink">
+            {duracion(ticket.fecha_registro, ticket.fecha_cierre)}
+          </span>{" "}
+          desde que se reportó.
         </p>
-        {ticket.historial?.length === 0 && (
-          <p className="text-sm text-muted italic">Sin cambios de estado todavía.</p>
-        )}
-        <div className="space-y-2">
-          {ticket.historial?.map((h) => (
-            <div key={h.id} className="flex items-center gap-2 text-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-ph-yellow-dark shrink-0" />
-              <span className="text-ink-soft">
-                <span className="capitalize">{h.estado_anterior.replace("_", " ")}</span>
-                {" → "}
-                <span className="capitalize font-medium">
-                  {h.estado_nuevo.replace("_", " ")}
-                </span>
-              </span>
-              <span className="text-xs text-muted font-mono ml-auto">
-                {new Date(h.fecha).toLocaleString("es-MX")}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
+
+      {etapas.length === 1 && abierta && (
+        <p className="text-sm text-muted italic mt-4 pl-1">
+          Nadie ha cambiado el estado todavía.
+        </p>
+      )}
     </div>
   );
 }

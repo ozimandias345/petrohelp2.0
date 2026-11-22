@@ -25,6 +25,8 @@ from .serializers import (
     RegistroSerializer,
     SolicitarCodigoSerializer,
     RestablecerSerializer,
+    CambiarPasswordSerializer,
+    MiPerfilSerializer,
     DepartamentoSerializer,
     EstacionSerializer,
     CategoriaSerializer,
@@ -34,7 +36,12 @@ from .serializers import (
     HistorialTicketSerializer,
     NotificacionSerializer,
 )
-from .permissions import TicketPermission, EsAdminGlobalOSoloLectura, EsAdminGlobal
+from .permissions import (
+    TicketPermission,
+    EsAdminGlobalOSoloLectura,
+    EsAdminGlobal,
+    EsAdminGlobalOJefeSoloLectura,
+)
 
 
 class DepartamentoViewSet(viewsets.ModelViewSet):
@@ -91,9 +98,17 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):
-    queryset = Usuario.objects.select_related("departamento").all()
+    queryset = Usuario.objects.select_related("departamento", "estacion").all()
     serializer_class = UsuarioSerializer
-    permission_classes = [EsAdminGlobal]
+    permission_classes = [EsAdminGlobalOJefeSoloLectura]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        # El jefe de departamento solo ve a la gente de su propia area.
+        if user.rol == "admin_departamento":
+            return qs.filter(departamento_id=user.departamento_id)
+        return qs
 
     def destroy(self, request, *args, **kwargs):
         # Usuario.tickets_creados, comentarios e historial usan on_delete=PROTECT
@@ -237,6 +252,13 @@ class MeView(APIView):
     def get(self, request):
         serializer = UsuarioSerializer(request.user)
         return Response(serializer.data)
+
+    def patch(self, request):
+        """Cada quien puede corregir su nombre y su correo, nada mas."""
+        serializer = MiPerfilSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UsuarioSerializer(request.user).data)
 
 
 class RegistroView(APIView):
@@ -382,5 +404,34 @@ class RestablecerView(APIView):
 
         return Response(
             {"detail": "Listo, tu contrasena se actualizo. Ya puedes iniciar sesion."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class CambiarPasswordView(APIView):
+    """
+    Cambio de contrasena desde el perfil, pidiendo la actual.
+
+    Al terminar se renueva el token: las sesiones abiertas en otros
+    dispositivos dejan de servir y se devuelve el token nuevo para que
+    quien hizo el cambio siga trabajando sin volver a entrar.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = CambiarPasswordSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        usuario = request.user
+        usuario.set_password(serializer.validated_data["nueva"])
+        usuario.save()
+
+        Token.objects.filter(user=usuario).delete()
+        token = Token.objects.create(user=usuario)
+
+        return Response(
+            {"detail": "Tu contrasena se actualizo.", "token": token.key},
             status=status.HTTP_200_OK,
         )

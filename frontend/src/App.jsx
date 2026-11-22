@@ -14,6 +14,10 @@ import CategoryList from "./pages/CategoryList";
 import Dispositivos from "./pages/Dispositivos";
 import Reportes from "./pages/Reportes";
 import Mapa from "./pages/Mapa";
+import Perfil from "./pages/Perfil";
+import ColaTrabajo from "./pages/ColaTrabajo";
+import StationList from "./pages/StationList";
+import Auditoria from "./pages/Auditoria";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -117,6 +121,31 @@ export default function App() {
                 <AdminGlobalRoute>
                   <CategoryList />
                 </AdminGlobalRoute>
+              }
+            />
+            <Route path="/perfil" element={<Perfil />} />
+            <Route
+              path="/estaciones"
+              element={
+                <AdminGlobalRoute>
+                  <StationList />
+                </AdminGlobalRoute>
+              }
+            />
+            <Route
+              path="/auditoria"
+              element={
+                <AdminGlobalRoute>
+                  <Auditoria />
+                </AdminGlobalRoute>
+              }
+            />
+            <Route
+              path="/cola"
+              element={
+                <AdminRoute>
+                  <ColaTrabajo />
+                </AdminRoute>
               }
             />
           </Route>

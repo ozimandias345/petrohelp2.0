@@ -7,7 +7,13 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.static import serve
 from rest_framework.authtoken.views import obtain_auth_token
-from tickets.views import MeView, RegistroView, SolicitarCodigoView, RestablecerView
+from tickets.views import (
+    MeView,
+    RegistroView,
+    SolicitarCodigoView,
+    RestablecerView,
+    CambiarPasswordView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -18,6 +24,8 @@ urlpatterns = [
     # Recuperar contrasena con un codigo enviado por correo
     path('api/auth/recuperar/', SolicitarCodigoView.as_view()),
     path('api/auth/restablecer/', RestablecerView.as_view()),
+    # Cambio de contrasena desde el perfil
+    path('api/auth/cambiar-password/', CambiarPasswordView.as_view()),
     path('api/', include('tickets.urls')),
 ]
 

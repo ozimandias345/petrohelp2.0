@@ -146,6 +146,40 @@ class RestablecerSerializer(serializers.Serializer):
         return data
 
 
+class CambiarPasswordSerializer(serializers.Serializer):
+    """Cambio de contrasena del propio usuario, desde su perfil."""
+    actual = serializers.CharField(write_only=True)
+    nueva = serializers.CharField(write_only=True)
+    nueva2 = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        usuario = self.context["request"].user
+        if not usuario.check_password(data.get("actual", "")):
+            raise serializers.ValidationError(
+                {"actual": "La contrasena actual no es correcta."}
+            )
+        if data.get("nueva") != data.get("nueva2"):
+            raise serializers.ValidationError(
+                {"nueva2": "Las dos contrasenas nuevas no coinciden."}
+            )
+        if data.get("nueva") == data.get("actual"):
+            raise serializers.ValidationError(
+                {"nueva": "La contrasena nueva tiene que ser distinta de la actual."}
+            )
+        try:
+            validar_contrasena(data.get("nueva"), usuario)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"nueva": list(e.messages)})
+        return data
+
+
+class MiPerfilSerializer(serializers.ModelSerializer):
+    """Los pocos datos que cada quien puede cambiar de si mismo."""
+    class Meta:
+        model = Usuario
+        fields = ["first_name", "last_name", "email"]
+
+
 class ComentarioTicketSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
 
@@ -173,6 +207,8 @@ class ComentarioTicketSerializer(serializers.ModelSerializer):
 
 
 class HistorialTicketSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+
     class Meta:
         model = HistorialTicket
         fields = "__all__"
@@ -191,6 +227,7 @@ class TicketSerializer(serializers.ModelSerializer):
     departamento_nombre = serializers.CharField(source="departamento.nombre", read_only=True)
     estacion_nombre = serializers.CharField(source="estacion.nombre", read_only=True)
     creado_por_nombre = serializers.CharField(source="creado_por.username", read_only=True)
+    asignado_a_nombre = serializers.CharField(source="asignado_a.username", read_only=True)
 
     comentarios = ComentarioTicketSerializer(many=True, read_only=True)
     historial = HistorialTicketSerializer(many=True, read_only=True)
@@ -203,7 +240,8 @@ class TicketSerializer(serializers.ModelSerializer):
             "departamento", "departamento_nombre",
             "estacion", "estacion_nombre",
             "prioridad", "estado",
-            "creado_por", "creado_por_nombre", "asignado_a",
+            "creado_por", "creado_por_nombre",
+            "asignado_a", "asignado_a_nombre",
             "fecha_registro", "fecha_actualizacion", "fecha_cierre",
             "comentarios", "historial",
         ]

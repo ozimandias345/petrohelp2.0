@@ -195,6 +195,50 @@ async def listar_dispositivos(_: dict = Depends(usuario_admin)):
     return salida
 
 
+@app.put("/api/dispositivos/{device_id}/umbrales")
+async def guardar_umbrales(device_id: str, cuerpo: dict,
+                           usuario: dict = Depends(usuario_admin)):
+    """
+    Guarda los umbrales de un dispositivo en dispositivos.json.
+
+    Solo el administrador global: cambiar un umbral es decidir a partir de
+    que valor el sistema considera que hay riesgo.
+    """
+    if usuario.get("rol") != "admin_global":
+        raise HTTPException(403, "Solo el administrador global puede cambiar los umbrales.")
+    if device_id not in config.DISPOSITIVOS:
+        raise HTTPException(404, "Dispositivo no encontrado")
+
+    limpios = {}
+    for sensor, valores in (cuerpo or {}).items():
+        if sensor not in reglas.UMBRALES_DEFAULT:
+            raise HTTPException(400, f"Sensor desconocido: {sensor}")
+        try:
+            media = float(valores["media"])
+            alta = float(valores["alta"])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(400, f"Valores invalidos en {sensor}.")
+        direccion = valores.get("direccion", reglas.UMBRALES_DEFAULT[sensor]["direccion"])
+        if direccion not in ("mayor", "menor"):
+            raise HTTPException(400, f"Direccion invalida en {sensor}.")
+        # "mayor" = salta cuando sube (alta > media). "menor" = al reves.
+        if direccion == "mayor" and alta <= media:
+            raise HTTPException(400, f"En {sensor}, el umbral alto debe ser mayor que el medio.")
+        if direccion == "menor" and alta >= media:
+            raise HTTPException(400, f"En {sensor}, el umbral alto debe ser menor que el medio.")
+        limpios[sensor] = {"media": media, "alta": alta, "direccion": direccion}
+
+    lista = config.lista_dispositivos()
+    for d in lista:
+        if d["device_id"] == device_id:
+            d["umbrales"] = limpios
+            break
+    config.guardar_dispositivos(lista)
+    log.info("Umbrales de %s actualizados por %s", device_id, usuario.get("username"))
+
+    return {"device_id": device_id, "umbrales": {**reglas.UMBRALES_DEFAULT, **limpios}}
+
+
 @app.get("/api/dispositivos/{device_id}/lecturas")
 async def lecturas_dispositivo(device_id: str, limite: int = Query(50, le=500),
                                _: dict = Depends(usuario_admin)):

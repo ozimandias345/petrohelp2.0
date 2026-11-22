@@ -81,3 +81,19 @@ class EsAdminGlobal(permissions.BasePermission):
             and request.user.is_authenticated
             and request.user.rol == "admin_global"
         )
+
+
+class EsAdminGlobalOJefeSoloLectura(permissions.BasePermission):
+    """
+    Usuarios del sistema: el admin_global gestiona todo; el administrador
+    de departamento solo puede CONSULTAR (para saber a quien asignarle un
+    ticket de su area). Nadie mas entra.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.rol == "admin_global":
+            return True
+        return user.rol == "admin_departamento" and request.method in permissions.SAFE_METHODS

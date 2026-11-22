@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import agentClient from "../api/agentClient";
+import { useAuth } from "../context/AuthContext";
 import Spinner from "../components/Spinner";
 
 // Monitoreo de los ESP32 instalados en las estaciones.
@@ -70,7 +71,121 @@ function hace(tsIso) {
   return `hace ${Math.round(seg / 3600)} h`;
 }
 
-function TarjetaDispositivo({ d }) {
+// Edición de los umbrales de un dispositivo. Sólo el administrador global:
+// mover un umbral es decidir a partir de qué valor el sistema ve riesgo.
+function EditorUmbrales({ d, onGuardado, onCerrar }) {
+  const [valores, setValores] = useState(() => {
+    const inicial = {};
+    SENSORES.forEach((s) => {
+      const u = d.umbrales?.[s.clave] || {};
+      inicial[s.clave] = {
+        media: u.media ?? "",
+        alta: u.alta ?? "",
+        direccion: u.direccion || "mayor",
+      };
+    });
+    return inicial;
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  function set(clave, campo, valor) {
+    setValores((prev) => ({ ...prev, [clave]: { ...prev[clave], [campo]: valor } }));
+  }
+
+  async function guardar(e) {
+    e.preventDefault();
+    setGuardando(true);
+    setError("");
+    try {
+      const cuerpo = {};
+      SENSORES.forEach((s) => {
+        const v = valores[s.clave];
+        cuerpo[s.clave] = {
+          media: Number(v.media),
+          alta: Number(v.alta),
+          direccion: v.direccion,
+        };
+      });
+      const res = await agentClient.put(`/dispositivos/${d.device_id}/umbrales`, cuerpo);
+      onGuardado(d.device_id, res.data.umbrales);
+      onCerrar();
+    } catch (err) {
+      setError(err.response?.data?.detail || "No se pudieron guardar los umbrales.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const chico =
+    "w-full bg-surface border border-border rounded-md px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ph-yellow";
+
+  return (
+    <form onSubmit={guardar} className="mt-4 bg-surface-alt border border-border rounded-md p-3">
+      <p className="text-[11px] font-mono uppercase tracking-wide text-muted mb-3">
+        Umbrales de alerta
+      </p>
+      <div className="space-y-3">
+        {SENSORES.map((s) => (
+          <div key={s.clave} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+            <span className="text-xs text-ink-soft pb-2">
+              {s.etiqueta} <span className="text-muted">({s.unidad})</span>
+              <span className="block text-[11px] text-muted">
+                {valores[s.clave].direccion === "mayor" ? "Alerta al subir" : "Alerta al bajar"}
+              </span>
+            </span>
+            <label className="text-[11px] text-muted">
+              Media
+              <input
+                type="number"
+                step="any"
+                required
+                value={valores[s.clave].media}
+                onChange={(e) => set(s.clave, "media", e.target.value)}
+                className={`${chico} w-20 mt-0.5`}
+              />
+            </label>
+            <label className="text-[11px] text-muted">
+              Alta
+              <input
+                type="number"
+                step="any"
+                required
+                value={valores[s.clave].alta}
+                onChange={(e) => set(s.clave, "alta", e.target.value)}
+                className={`${chico} w-20 mt-0.5`}
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-danger font-medium mt-3">{error}</p>}
+
+      <div className="flex gap-2 mt-4">
+        <button
+          disabled={guardando}
+          className="bg-ph-yellow text-ph-black font-semibold text-xs rounded-md px-3 py-1.5 hover:bg-ph-yellow-dark transition-colors disabled:opacity-50"
+        >
+          {guardando ? "Guardando…" : "Guardar umbrales"}
+        </button>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="text-xs font-medium text-muted hover:text-ink px-2"
+        >
+          Cancelar
+        </button>
+      </div>
+      <p className="text-[11px] text-muted mt-2 leading-snug">
+        Se aplican de inmediato: el agente los usa en la siguiente lectura.
+      </p>
+    </form>
+  );
+}
+
+function TarjetaDispositivo({ d, esGlobal, onGuardado }) {
+  const [editando, setEditando] = useState(false);
   const l = d.ultima_lectura;
   return (
     <div className="bg-surface border border-border rounded-lg p-4">
@@ -112,11 +227,25 @@ function TarjetaDispositivo({ d }) {
           {d.alertas_24h} alerta(s) en 24 h
         </span>
       </div>
+
+      {esGlobal && !editando && (
+        <button
+          onClick={() => setEditando(true)}
+          className="mt-3 text-xs font-semibold text-ph-black border border-border hover:border-ph-yellow hover:bg-ph-yellow-tint rounded-md px-2.5 py-1 transition-colors"
+        >
+          Ajustar umbrales
+        </button>
+      )}
+      {esGlobal && editando && (
+        <EditorUmbrales d={d} onGuardado={onGuardado} onCerrar={() => setEditando(false)} />
+      )}
     </div>
   );
 }
 
 export default function Dispositivos() {
+  const { user } = useAuth();
+  const esGlobal = user?.rol === "admin_global";
   const [dispositivos, setDispositivos] = useState([]);
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +262,13 @@ export default function Dispositivos() {
         setError("No se pudo conectar con el agente.")
       )
       .finally(() => setLoading(false));
+  }
+
+  // Refleja los umbrales nuevos sin esperar al refresco de 10 s.
+  function actualizarUmbrales(deviceId, umbrales) {
+    setDispositivos((prev) =>
+      prev.map((x) => (x.device_id === deviceId ? { ...x, umbrales } : x))
+    );
   }
 
   useEffect(() => {
@@ -175,7 +311,12 @@ export default function Dispositivos() {
 
       <div className="grid gap-3 md:grid-cols-2">
         {dispositivos.map((d) => (
-          <TarjetaDispositivo key={d.device_id} d={d} />
+          <TarjetaDispositivo
+            key={d.device_id}
+            d={d}
+            esGlobal={esGlobal}
+            onGuardado={actualizarUmbrales}
+          />
         ))}
       </div>
 

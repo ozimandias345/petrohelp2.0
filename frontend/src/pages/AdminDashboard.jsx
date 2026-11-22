@@ -5,6 +5,8 @@ import {
   Cell,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -112,6 +114,70 @@ export default function AdminDashboard() {
     }, {})
   );
 
+  // --- Comparativa por estación: cuántas incidencias genera cada una
+  // y cuánto tarda en cerrarlas. Responde "¿cuál me está dando lata?".
+  const porEstacion = Object.values(
+    tickets.reduce((acc, t) => {
+      const nombre = t.estacion_nombre || "Sin estación";
+      if (!acc[nombre]) acc[nombre] = { estacion: nombre, abiertas: 0, cerradas: 0, dias: [] };
+      if (t.estado === "cerrado") {
+        acc[nombre].cerradas += 1;
+        if (t.fecha_cierre) {
+          const d =
+            (new Date(t.fecha_cierre) - new Date(t.fecha_registro)) / 86400000;
+          if (d >= 0) acc[nombre].dias.push(d);
+        }
+      } else {
+        acc[nombre].abiertas += 1;
+      }
+      return acc;
+    }, {})
+  )
+    .map((e) => ({
+      ...e,
+      total: e.abiertas + e.cerradas,
+      promedio: e.dias.length
+        ? Number((e.dias.reduce((a, b) => a + b, 0) / e.dias.length).toFixed(1))
+        : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  // --- Tendencia: incidencias registradas por semana, últimas 8 semanas.
+  const tendencia = (() => {
+    const semanas = [];
+    const hoy = new Date();
+    for (let i = 7; i >= 0; i--) {
+      const fin = new Date(hoy.getTime() - i * 7 * 86400000);
+      const inicio = new Date(fin.getTime() - 6 * 86400000);
+      semanas.push({
+        etiqueta: `${inicio.getDate()}/${inicio.getMonth() + 1}`,
+        inicio: new Date(inicio.setHours(0, 0, 0, 0)),
+        fin: new Date(fin.setHours(23, 59, 59, 999)),
+        registradas: 0,
+        cerradas: 0,
+      });
+    }
+    tickets.forEach((t) => {
+      const alta = new Date(t.fecha_registro);
+      const cierre = t.fecha_cierre ? new Date(t.fecha_cierre) : null;
+      semanas.forEach((s) => {
+        if (alta >= s.inicio && alta <= s.fin) s.registradas += 1;
+        if (cierre && cierre >= s.inicio && cierre <= s.fin) s.cerradas += 1;
+      });
+    });
+    return semanas;
+  })();
+
+  // Tiempo promedio de cierre, en días, sobre todo lo cerrado.
+  const promedioCierre = (() => {
+    const dias = tickets
+      .filter((t) => t.estado === "cerrado" && t.fecha_cierre)
+      .map((t) => (new Date(t.fecha_cierre) - new Date(t.fecha_registro)) / 86400000)
+      .filter((d) => d >= 0);
+    if (!dias.length) return null;
+    return (dias.reduce((a, b) => a + b, 0) / dias.length).toFixed(1);
+  })();
+
   const porPrioridad = [
     { name: "Alta", value: tickets.filter((t) => t.prioridad === "alta").length, key: "alta" },
     { name: "Media", value: tickets.filter((t) => t.prioridad === "media").length, key: "media" },
@@ -137,6 +203,14 @@ export default function AdminDashboard() {
         <StatCard label="En proceso" value={enProceso} accent="#e08a1e" />
         <StatCard label="Cerrados" value={cerrados} accent="#1f9d63" />
       </div>
+
+      {promedioCierre !== null && (
+        <p className="-mt-6 mb-8 text-sm text-muted">
+          Tiempo promedio de cierre:{" "}
+          <span className="font-semibold text-ink">{promedioCierre} días</span>{" "}
+          sobre {cerrados} incidencia(s) cerradas.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-surface border border-border rounded-lg p-5 shadow-sm">
@@ -221,6 +295,101 @@ export default function AdminDashboard() {
               <Bar dataKey="cantidad" fill="#ffc400" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="bg-surface border border-border rounded-lg p-5 shadow-sm mt-6">
+        <p className="text-xs font-mono uppercase tracking-wide text-muted mb-1">
+          Tendencia de las últimas 8 semanas
+        </p>
+        <p className="text-xs text-muted mb-4">
+          Si la línea de cerradas va por encima de la de registradas, el rezago baja.
+        </p>
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart data={tendencia}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e7e7ea" />
+            <XAxis dataKey="etiqueta" stroke="#8a8a90" fontSize={12} />
+            <YAxis stroke="#8a8a90" fontSize={12} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{
+                background: "#ffffff",
+                border: "1px solid #e7e7ea",
+                borderRadius: 8,
+                color: "#1a1a1a",
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="registradas"
+              name="Registradas"
+              stroke="#d92d20"
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="cerradas"
+              name="Cerradas"
+              stroke="#1f9d63"
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {user?.rol === "admin_global" && porEstacion.length > 0 && (
+        <div className="bg-surface border border-border rounded-lg p-5 shadow-sm mt-6">
+          <p className="text-xs font-mono uppercase tracking-wide text-muted mb-1">
+            Comparativa por estación
+          </p>
+          <p className="text-xs text-muted mb-4">
+            Cuántas incidencias genera cada estación y cuánto tarda en cerrarlas.
+          </p>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={porEstacion}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e7e7ea" />
+              <XAxis dataKey="estacion" stroke="#8a8a90" fontSize={12} />
+              <YAxis stroke="#8a8a90" fontSize={12} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{
+                  background: "#ffffff",
+                  border: "1px solid #e7e7ea",
+                  borderRadius: 8,
+                  color: "#1a1a1a",
+                }}
+              />
+              <Bar dataKey="abiertas" name="Abiertas" stackId="a" fill="#d92d20" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="cerradas" name="Cerradas" stackId="a" fill="#1f9d63" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-border">
+                  <th className="py-2 font-mono text-xs uppercase tracking-wide text-muted">Estación</th>
+                  <th className="py-2 font-mono text-xs uppercase tracking-wide text-muted">Total</th>
+                  <th className="py-2 font-mono text-xs uppercase tracking-wide text-muted">Abiertas</th>
+                  <th className="py-2 font-mono text-xs uppercase tracking-wide text-muted">Cierre promedio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porEstacion.map((e) => (
+                  <tr key={e.estacion} className="border-b border-border last:border-0">
+                    <td className="py-2 text-ink">{e.estacion}</td>
+                    <td className="py-2 text-ink-soft">{e.total}</td>
+                    <td className={`py-2 ${e.abiertas > 0 ? "text-danger font-medium" : "text-ink-soft"}`}>
+                      {e.abiertas}
+                    </td>
+                    <td className="py-2 text-ink-soft">
+                      {e.promedio ? `${e.promedio} días` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
