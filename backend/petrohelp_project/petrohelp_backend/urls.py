@@ -13,6 +13,7 @@ from tickets.views import (
     SolicitarCodigoView,
     RestablecerView,
     CambiarPasswordView,
+    SaludView,
 )
 
 urlpatterns = [
@@ -26,6 +27,8 @@ urlpatterns = [
     path('api/auth/restablecer/', RestablecerView.as_view()),
     # Cambio de contrasena desde el perfil
     path('api/auth/cambiar-password/', CambiarPasswordView.as_view()),
+    # Diagnostico del balanceador: dice que replica respondio
+    path('api/salud/', SaludView.as_view()),
     path('api/', include('tickets.urls')),
 ]
 

@@ -1,0 +1,81 @@
+# PetroHelp en contenedores, con balanceo de cargas.
+#
+#   nginx  ->  reparte el trafico entre api1 y api2 (round robin)
+#   api1   ->  Django + Gunicorn   (replica 1)
+#   api2   ->  Django + Gunicorn   (replica 2)
+#   db     ->  PostgreSQL
+#   web    ->  React servido por nginx
+#
+# Levantar todo:   docker compose up --build
+# Ver el balanceo: docker compose logs -f api1 api2
+# Apagar:          docker compose down
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: petrohelp-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dbpetro}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-petrohelp}
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api1: &api
+    build:
+      context: ./backend/petrohelp_project
+    container_name: petrohelp-api1
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-petrohelp}@db:5432/${DB_NAME:-dbpetro}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cambia-esta-llave-en-produccion}
+      DJANGO_DEBUG: "False"
+      NOMBRE_REPLICA: api1
+      # Solo esta replica crea el administrador y los catalogos iniciales.
+      SEMBRAR_DATOS: "true"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api2:
+    <<: *api
+    container_name: petrohelp-api2
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-petrohelp}@db:5432/${DB_NAME:-dbpetro}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cambia-esta-llave-en-produccion}
+      DJANGO_DEBUG: "False"
+      NOMBRE_REPLICA: api2
+      SEMBRAR_DATOS: "false"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Mismo origen: nginx reparte /api hacia las replicas.
+        VITE_API_URL: /api
+    container_name: petrohelp-web
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: petrohelp-balanceador
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/balanceador.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api1
+      - api2
+      - web
+    restart: unless-stopped
+
+volumes:
+  datos_postgres:

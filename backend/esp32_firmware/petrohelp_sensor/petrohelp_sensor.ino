@@ -12,27 +12,44 @@
  */
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <WiFiMulti.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include "config.h"
 
 DHT dht(PIN_DHT, DHT22);
+WiFiMulti wifiMulti;
+bool redesCargadas = false;
+// Cliente TLS para cuando AGENTE_URL es https (tunel).
+WiFiClientSecure clienteSeguro;
+
 unsigned long ultimoEnvio = 0;
 bool alertaActiva = false;
 
 void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
-  Serial.printf("Conectando a %s", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
-    delay(500);
-    Serial.print(".");
+
+  if (!redesCargadas) {
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_STA);
+    for (int i = 0; i < WIFI_REDES_TOTAL; i++) {
+      wifiMulti.addAP(WIFI_REDES[i].ssid, WIFI_REDES[i].clave);
+      Serial.printf("Red configurada: \"%s\"\n", WIFI_REDES[i].ssid);
+    }
+    redesCargadas = true;
   }
-  Serial.println(WiFi.status() == WL_CONNECTED ? " OK" : " FALLO");
-  if (WiFi.status() == WL_CONNECTED) {
+
+  Serial.print("Buscando una red conocida");
+  if (wifiMulti.run(20000) == WL_CONNECTED) {
+    Serial.printf("\nConectado a \"%s\"\n", WiFi.SSID().c_str());
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
+    Serial.printf("Enviando lecturas a: %s\n", AGENTE_URL);
+  } else {
+    Serial.println("\nNo se pudo conectar a ninguna red configurada.");
+    Serial.println("Revisa nombres, contrasenas y que sean de 2.4 GHz.");
+    delay(5000);
   }
 }
 
@@ -94,9 +111,15 @@ void enviarLectura() {
   Serial.println("-> " + cuerpo);
 
   HTTPClient http;
-  http.begin(AGENTE_URL);
-  http.setTimeout(10000);
+  if (String(AGENTE_URL).startsWith("https")) {
+    clienteSeguro.setInsecure();   // sin validar certificado: suficiente aqui
+    http.begin(clienteSeguro, AGENTE_URL);
+  } else {
+    http.begin(AGENTE_URL);
+  }
+  http.setTimeout(15000);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("ngrok-skip-browser-warning", "true");
   http.addHeader("X-Device-Id", DEVICE_ID);
   http.addHeader("X-Device-Key", DEVICE_KEY);
   int codigo = http.POST(cuerpo);

@@ -422,3 +422,22 @@ class CambiarPasswordView(APIView):
             {"detail": "Tu contrasena se actualizo.", "token": token.key},
             status=status.HTTP_200_OK,
         )
+
+
+class SaludView(APIView):
+    """
+    Endpoint de diagnostico. Dice que replica del servidor de aplicaciones
+    atendio la peticion, que es como se comprueba que el balanceador de
+    cargas esta repartiendo el trafico entre varias instancias.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        import os, socket
+        return Response({
+            "ok": True,
+            "replica": os.getenv("NOMBRE_REPLICA", socket.gethostname()),
+            "host": socket.gethostname(),
+            "hora": timezone.now().isoformat(),
+        })

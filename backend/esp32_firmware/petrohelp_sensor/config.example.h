@@ -2,10 +2,18 @@
 #pragma once
 
 // --- WiFi ---
-#define WIFI_SSID     "TU_RED_WIFI"
-#define WIFI_PASSWORD "TU_CONTRASENA"
+// Puedes poner varias redes: la placa se conecta a la que alcance.
+// Tienen que ser de 2.4 GHz (el ESP32 no ve las de 5 GHz).
+struct RedWiFi { const char *ssid; const char *clave; };
+
+static const RedWiFi WIFI_REDES[] = {
+  { "TU_RED_WIFI", "TU_CONTRASENA" },
+};
+
+static const int WIFI_REDES_TOTAL = sizeof(WIFI_REDES) / sizeof(WIFI_REDES[0]);
 
 // --- Agente FastAPI (IP de la PC donde corre uvicorn, puerto 8001) ---
+// Puede ser la IP local del agente o la direccion del tunel (https).
 #define AGENTE_URL    "http://192.168.1.100:8001/api/lecturas"
 
 // --- Identidad del dispositivo (debe existir en dispositivos.json) ---
