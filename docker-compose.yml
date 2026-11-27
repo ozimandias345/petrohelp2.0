@@ -36,7 +36,9 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cambia-esta-llave-en-produccion}
       DJANGO_DEBUG: "False"
       NOMBRE_REPLICA: api1
-      # Solo esta replica crea el administrador y los catalogos iniciales.
+      # Solo esta replica migra la base y crea los datos iniciales;
+      # la otra espera a que termine.
+      EJECUTAR_MIGRACIONES: "true"
       SEMBRAR_DATOS: "true"
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
@@ -53,6 +55,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cambia-esta-llave-en-produccion}
       DJANGO_DEBUG: "False"
       NOMBRE_REPLICA: api2
+      EJECUTAR_MIGRACIONES: "false"
       SEMBRAR_DATOS: "false"
 
   web:

@@ -21,7 +21,21 @@ if url:
         raise SystemExit("La base de datos no respondio a tiempo.")
 PY
 
-python manage.py migrate --no-input
+# Solo una replica aplica las migraciones. Si las dos lo intentan a la
+# vez sobre una base vacia, chocan al crear las mismas tablas y una de
+# ellas revienta con un error de clave duplicada.
+if [ "${EJECUTAR_MIGRACIONES:-true}" = "true" ]; then
+  python manage.py migrate --no-input
+else
+  echo "Esperando a que la replica principal aplique las migraciones..."
+  for intento in $(seq 1 90); do
+    if python manage.py migrate --check >/dev/null 2>&1; then
+      echo "Migraciones listas."
+      break
+    fi
+    sleep 2
+  done
+fi
 
 # Solo la primera replica siembra los datos iniciales, para no duplicarlos.
 if [ "${SEMBRAR_DATOS:-false}" = "true" ]; then
